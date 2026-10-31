@@ -352,7 +352,7 @@ metadata:
   title: 'Nouveau Stay: hotel websites that sell the stay'
 name: Nouveau Stay
 native_deps:
-  head_html: "<script src=\"_/theme/legal-kit.js?v=7a22943d85\"></script>\n<meta name=\"viewport\" content=\"width=device-width,\
+  head_html: "<script src=\"_/theme/legal-kit.js?v=dccf8e073a\"></script>\n<meta name=\"viewport\" content=\"width=device-width,\
     \ initial-scale=1, viewport-fit=cover\">\n<meta name=\"theme-color\" content=\"#1f5c55\">\n<meta name=\"apple-mobile-web-app-capable\"\
     \ content=\"yes\">\n<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n<link rel=\"preconnect\" href=\"\
     https://fonts.gstatic.com\" crossorigin>\n<link href=\"https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Federo&family=Jost:wght@400;500;600;700&display=swap\"\

@@ -8,7 +8,7 @@ and explains how booking and payment work. Sites are hosted at their own link he
 Built on [Anvil](https://anvil.works). The first site is **Boutique Hotel Kristofs**, Teātra iela 6, Old Riga.
 
 - **App repo:** github.com/arkulinskis/hotel-websites-platform (branch `master`). Anvil pulls `master`.
-- **Live:** not published yet (the user will send the address).
+- **Live:** https://arvistay.com (custom domain)
 
 ## What it does
 

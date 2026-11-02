@@ -1,4 +1,4 @@
-/* ns-site.js: the Nouveau Stay hotel-website renderer. Built from web/site/*.js (joined by name).
+/* ns-site.js: the ArviStay hotel-website renderer. Built from web/site/*.js (joined by name).
    The same file draws the owner's live preview (in the app), the hosted page (<app>/_/api/s/<slug>) and the
    exported site (inlined into index.html). It must not depend on the app: no window.UI, no server calls.
 
@@ -1070,7 +1070,7 @@
     }
     function footer() {
       var h = data.hotel || {}, credits = (data.credits || []).filter(function (c) { return c && c.text; });
-      var pl = opts.platform || { name: 'Nouveau Stay' };
+      var pl = opts.platform || { name: 'ArviStay' };
       return '<footer class="ns-foot">' + NS.orn.divider() + '<div class="ns-foot-in"><div>' + NS.orn.monogram(h.name) + '<b>' + e(h.name || '') + '</b><p>' + e([h.address, h.phone].filter(Boolean).join(' · ')) + '</p></div>' +
         (credits.length ? '<details class="ns-credits"><summary>Photo and data credits</summary><ul>' + credits.map(function (c) {
           return '<li>' + (c.url ? '<a href="' + e(c.url) + '" target="_blank" rel="noopener">' + e(c.text) + '</a>' : e(c.text)) + '</li>';

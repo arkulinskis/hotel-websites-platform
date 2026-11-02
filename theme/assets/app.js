@@ -385,7 +385,7 @@
 (function () {
   'use strict';
   UI.configure({
-    name: 'Nouveau Stay',
+    name: 'ArviStay',
     key: 'nouveaustay',          // prefix for this app's browser storage
     tagline: 'Hotel websites in the Art Nouveau spirit. Made in Montréal, for hoteliers everywhere.',   // footer line
     home: 'sites',               // first page after signing in

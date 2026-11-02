@@ -21,7 +21,7 @@ try:
 except Exception:
     SITE_V = "dev"
 
-PLATFORM = "Nouveau Stay"
+PLATFORM = "ArviStay"
 PIXEL = base64.b64decode("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")
 BG = {"riga": "#f3ecdf", "mucha": "#f6eee5", "horta": "#142019", "klimt": "#12110f", "peacock": "#eef3f0", "lily": "#fbfaf7"}
 

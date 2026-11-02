@@ -14,8 +14,8 @@ except ImportError:  # seo.py imports this file outside Anvil to render previews
     anvil = None
 
 SEO = {
- "name": "Nouveau Stay",
- "title": "Nouveau Stay: Art Nouveau websites for small hotels",
+ "name": "ArviStay",
+ "title": "ArviStay: Art Nouveau websites for small hotels",
  "tagline": "Hotel websites that sell the stay",
  "description": "Make a beautiful Art Nouveau website for your hotel: rooms, videos, 360-degree tours, a 3D neighbourhood map and an hour-by-hour stay plan for every kind of guest.",
  "keywords": [
@@ -33,7 +33,7 @@ SEO = {
  "category": "BusinessApplication",
  "audience": "Owners of small and boutique hotels",
  "about": [
-  "Nouveau Stay is a website builder for small hotels, in the Art Nouveau spirit. An owner types the hotel's address; Nouveau Stay maps the neighbourhood, drafts the texts, ranks 30 kinds of guest by how well the area suits them, and builds a phone-first site.",
+  "ArviStay is a website builder for small hotels, in the Art Nouveau spirit. An owner types the hotel's address; ArviStay maps the neighbourhood, drafts the texts, ranks 30 kinds of guest by how well the area suits them, and builds a phone-first site.",
   "Sites have rooms, photos, videos, 360-degree tours, a 3D neighbourhood map and an hour-by-hour plan for each kind of guest. Booking stays on Booking.com, Hotels.com and the like: the site sells the stay and explains how booking works. Sites are hosted here or downloaded and hosted anywhere."
  ],
  "features": [
@@ -45,7 +45,7 @@ SEO = {
  ],
  "faq": [
   [
-   "Does Nouveau Stay take bookings?",
+   "Does ArviStay take bookings?",
    "No. Booking stays with Booking.com, Hotels.com and similar; the site sells the stay and explains how booking and payment work."
   ],
   [
@@ -58,7 +58,7 @@ SEO = {
   ]
  ],
  "site": "https://arvistay.com",
- "updated": "2026-10-31",
+ "updated": "2026-11-02",
  "icon": "icon-512.png",
  "colors": {
   "bg": "#1f5c55",

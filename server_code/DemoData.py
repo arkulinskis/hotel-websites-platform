@@ -8,6 +8,7 @@ Two kinds:
     stats, so Explore and the stats look alive. Loaded on first visit, removable in Admin -> Demo data.
 """
 import datetime as dt
+import json
 import random
 
 from anvil.tables import app_tables
@@ -27,8 +28,27 @@ def ensure_loaded():
     """Call from the app's main data callables: makes the showcase once, loads the demo once (unless removed)."""
     from . import Showcase
     Showcase.ensure()
+    rebrand()
     if state() == "never":
         load()
+
+
+OLD_BRAND, BRAND = "Nouveau Stay", "ArviStay"
+
+
+def rebrand():
+    """Once: the app was renamed from Nouveau Stay to ArviStay (2026-11-02). Demo sites loaded before that still
+    say "A Nouveau Stay demo" in their stored JSON, so swap the name there."""
+    if C.get_setting("brand") == BRAND:
+        return
+    for site in app_tables.sites.search(is_demo=True):
+        for col in ("data", "live"):
+            v = site[col]
+            if v:
+                s = json.dumps(v)
+                if OLD_BRAND in s:
+                    site[col] = json.loads(s.replace(OLD_BRAND, BRAND))
+    C.set_setting("brand", BRAND)
 
 
 def load():

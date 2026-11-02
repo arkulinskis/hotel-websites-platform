@@ -352,7 +352,7 @@ metadata:
   title: 'Nouveau Stay: Art Nouveau websites for small hotels'
 name: Nouveau Stay
 native_deps:
-  head_html: "<script src=\"_/theme/legal-kit.js?v=ef770889de\"></script>\n<!-- seo:start (APP_MAKER/seo: edit seo/apps/nouveaustay.json\
+  head_html: "<script src=\"_/theme/legal-kit.js?v=8a8aaba5e2\"></script>\n<!-- seo:start (APP_MAKER/seo: edit seo/apps/nouveaustay.json\
     \ and run seo.py, not here) -->\n<link rel=\"canonical\" href=\"https://arvistay.com/\">\n<meta name=\"robots\" content=\"\
     index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1\">\n<meta name=\"keywords\" content=\"hotel\
     \ website builder, boutique hotel website, small hotel website, hotel website design, 360 tour hotel, neighbourhood map\
@@ -396,7 +396,7 @@ native_deps:
     \ channel). No floating button, no cookies, nothing loads until it is opened. Codes: APP_MAKER/prepsto-links.json -->\n\
     <script src=\"https://prepsto.com/_/theme/widget.js\" data-prepsto=\"uavfgu6\" data-button=\"false\" data-label=\"Submit\
     \ feedback\" async></script>\n<script src=\"_/theme/ns-site.js?v=48fcad0ebd\"></script>\n<link rel=\"stylesheet\" href=\"\
-    _/theme/ns-site.css?v=48fcad0ebd\">\n<link rel=\"stylesheet\" href=\"_/theme/app.css?v=60e288fd59\">\n<script src=\"_/theme/app.js?v=c644c464be\"\
+    _/theme/ns-site.css?v=48fcad0ebd\">\n<link rel=\"stylesheet\" href=\"_/theme/app.css?v=5965b26cdc\">\n<script src=\"_/theme/app.js?v=ceabedd292\"\
     ></script>\n"
 package_name: Nouveau_Stay
 runtime_options:
@@ -417,9 +417,13 @@ services:
     remember_me_days: 30
     require_secure_passwords: true
     use_email: true
+    use_google: true
   server_config:
     user_table: users
   source: /runtime/services/anvil/users.yml
+- client_config: {}
+  server_config: {}
+  source: /runtime/services/google.yml
 startup:
   module: Main
   type: form

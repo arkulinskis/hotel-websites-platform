@@ -352,7 +352,7 @@ metadata:
   title: 'ArviStay: Art Nouveau websites for small hotels'
 name: ArviStay
 native_deps:
-  head_html: "<script src=\"_/theme/legal-kit.js?v=37399ba655\"></script>\n<!-- seo:start (APP_MAKER/seo: edit seo/apps/nouveaustay.json\
+  head_html: "<script src=\"_/theme/legal-kit.js?v=4e51f2adf3\"></script>\n<!-- seo:start (APP_MAKER/seo: edit seo/apps/nouveaustay.json\
     \ and run seo.py, not here) -->\n<link rel=\"canonical\" href=\"https://arvistay.com/\">\n<meta name=\"robots\" content=\"\
     index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1\">\n<meta name=\"keywords\" content=\"hotel\
     \ website builder, boutique hotel website, small hotel website, hotel website design, 360 tour hotel, neighbourhood map\

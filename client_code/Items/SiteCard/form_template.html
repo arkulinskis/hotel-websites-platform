@@ -1,0 +1,29 @@
+<div class="st-item">
+  <article class="ui-card st-card" anvil:name="card">
+    <div class="st-cover" anvil:name="cover">
+      <span class="st-lily" anvil:name="lily" aria-hidden="true"><svg viewBox="0 0 120 160" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M60 158c0-40-3-70-22-96M60 158c2-30 10-52 30-70"/><path d="M38 60C20 54 12 34 18 10c12 4 20 12 22 24 2-18 8-30 20-38 12 8 18 20 20 38 2-12 10-20 22-24 6 24-2 44-20 50-14 5-30 5-44 0z"/></svg></span>
+      <span class="st-badge" anvil:dom-node="status"></span>
+      <span class="nsa-sw" aria-hidden="true" anvil:dom-node="swatch"></span>
+    </div>
+    <div class="st-body">
+      <h3><span anvil:dom-node="name"></span><span class="ui-badge" anvil:name="demo_badge">Demo</span><span class="ui-badge brand" anvil:name="showcase_badge">Showcase</span></h3>
+      <div class="st-meta">
+        <span anvil:name="city_box"><i class="ic ic-pin"></i><span anvil:dom-node="city"></span></span>
+        <span><i class="ic ic-clock"></i><span anvil:dom-node="edited"></span></span>
+        <span anvil:name="views_box"><i class="ic ic-sparkle"></i><span anvil:dom-node="views"></span></span>
+      </div>
+      <div class="st-meta" anvil:name="owner_box"><span><i class="ic ic-user"></i><span anvil:dom-node="owner"></span></span></div>
+      <a class="st-link" anvil:name="link" target="_blank" rel="noopener"></a>
+      <span class="ui-badge warn st-changes" anvil:name="changes">Changes not published yet</span>
+      <div class="st-actions">
+        <a class="ui-btn primary sm" anvil:name="edit_link" href="#sites"><i class="ic ic-edit"></i>Edit</a>
+        <a class="ui-btn sm" anvil:name="view_link" target="_blank" rel="noopener"><i class="ic ic-external"></i>View</a>
+        <anvil-component type="Button" name="copy_button" prop:text="Copy link" prop:role='["btn", "btn-sm", "btn-ghost", "ic-copy"]'></anvil-component>
+      </div>
+    </div>
+  </article>
+  <a class="ui-card st-new" href="#new" anvil:name="new_card">
+    <span class="st-new-in"><span class="big"><i class="ic ic-plus"></i></span><b class="st-new-title">Create a hotel site</b>
+    <span class="muted small">Type the address. We find what is nearby, write the texts and pick your guests.</span></span>
+  </a>
+</div>

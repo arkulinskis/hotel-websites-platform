@@ -1,0 +1,37 @@
+<div class="ed-host">
+  <div class="ui ed" anvil:name="ed_box">
+    <div class="ed-top">
+      <a class="ui-btn ghost icon" href="#sites" aria-label="Back to your sites"><i class="ic ic-back"></i></a>
+      <div class="ed-title">
+        <anvil-component type="Label" name="title" prop:role='["ed-h1"]'></anvil-component>
+        <span class="ed-save" anvil:name="save_box"><i aria-hidden="true"></i><anvil-component type="Label" name="save_label" prop:text="Saved" prop:role='["ed-save-text"]'></anvil-component></span>
+      </div>
+      <div class="ui-seg ed-dev" role="group" aria-label="Preview size">
+        <button type="button" data-dev="desktop" anvil:name="dev_desktop" anvil:on-dom:click="self.dev_click">Desktop</button>
+        <button type="button" data-dev="tablet" anvil:name="dev_tablet" anvil:on-dom:click="self.dev_click">Tablet</button>
+        <button type="button" data-dev="phone" anvil:name="dev_phone" anvil:on-dom:click="self.dev_click">Phone</button>
+      </div>
+      <anvil-component type="DropDown" name="persona_select" prop:role='["ed-persel"]'></anvil-component>
+      <anvil-component type="Button" name="switch_button" prop:text="Preview" prop:role='["btn", "btn-sm", "ed-switch", "ic-globe"]'></anvil-component>
+      <anvil-component type="Button" name="publish_button" prop:text="Publish" prop:role='["btn", "btn-primary", "btn-sm", "ed-pub", "ic-globe"]'></anvil-component>
+    </div>
+    <div class="ed-body">
+      <nav class="ed-tabs" aria-label="Editor sections">
+        <anvil-component type="RepeatingPanel" name="tabs_panel" prop:item_template="Nouveau_Stay.Items.EdTab" prop:role='["contents"]'></anvil-component>
+      </nav>
+      <section class="ed-panel" anvil:name="panel" aria-label="Settings">
+        <anvil-component type="Nouveau_Stay.Components.EditorPanel" name="fields"></anvil-component>
+        <anvil-component type="Nouveau_Stay.Components.PublishPanel" name="publish_panel"></anvil-component>
+      </section>
+      <anvil-component type="Nouveau_Stay.Components.SitePreview" name="preview"></anvil-component>
+    </div>
+  </div>
+  <div class="ui ui-wrap ui-narrow ed-missing" anvil:name="missing">
+    <div class="ui-empty">
+      <i class="ic ic-info"></i>
+      <h1 class="ed-missing-h">This site isn't here</h1>
+      <anvil-component type="Label" name="missing_text" prop:role='["fine-print"]'></anvil-component>
+      <p><a class="ui-btn primary" href="#sites"><i class="ic ic-back"></i>Back to your sites</a></p>
+    </div>
+  </div>
+</div>

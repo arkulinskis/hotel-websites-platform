@@ -1,0 +1,137 @@
+<anvil-form layout="Nouveau_Stay.Layouts.Shell">
+  <anvil-block slot="content">
+    <div class="lp">
+      <section class="lp-hero">
+        <div class="ui-wrap">
+          <div>
+            <h1>A hotel website that <em>sells the stay</em>, not just the room</h1>
+            <p class="lp-lead">Type your address. ArviStay finds every café, museum and park around you, writes a stay for 30 kinds of guest, and builds a beautiful Art Nouveau website for your hotel with your rooms, videos and 360° tours. Guests still book on Booking.com or Hotels.com, the way they already do.</p>
+            <div class="lp-cta">
+              <a class="ui-btn primary lg" href="#auth/signup" anvil:name="guest_cta">Create your hotel site <i class="ic ic-arrow"></i></a>
+              <a class="ui-btn primary lg" href="#sites" anvil:name="member_cta">Open your sites <i class="ic ic-arrow"></i></a>
+              <a class="ui-btn lg" anvil:name="showcase_link" href="#explore" target="_blank" rel="noopener"><i class="ic ic-external"></i>See Hotel Kristofs</a>
+            </div>
+            <div class="lp-proof"><span><i class="ic ic-check"></i>Free while in beta</span><span><i class="ic ic-check"></i>No coding, no plugins</span><span><i class="ic ic-check"></i>Host with us or download it</span></div>
+          </div>
+          <div class="lp-art" aria-hidden="true">
+            <div class="lp-site">
+              <div class="bar"><i></i><i></i><i></i><span>…/s/hotel-kristofs</span></div>
+              <div class="shot" style="background-image:url(_/theme/k-blackheads.jpg)"><div class="ttl"><small>★★★ BOUTIQUE HOTEL · OLD RIGA</small><b>Hotel Kristofs</b><em>Sleep in an 18th-century mansion.</em></div></div>
+              <div class="pers"><span>Everyone</span><span class="on">Art Nouveau Admirer</span><span>Foodie</span><span>Romantic Couple</span><span>Family</span></div>
+            </div>
+            <div class="lp-float lp-mapc"><svg viewBox="0 0 200 150"><rect width="200" height="150" rx="10" fill="var(--c-surface-2)"/><g fill="var(--c-brand-soft)" stroke="var(--c-line)"><path d="M30 40l26 -8l18 8l-26 8z"/><path d="M30 40v12.6 l26 8v-12.6 z" fill="var(--c-line)"/><path d="M70 28l22 -8l26 8l-22 8z"/><path d="M70 28v18.2 l22 8v-18.2 z" fill="var(--c-line)"/><path d="M110 46l30 -8l16 8l-30 8z"/><path d="M110 46v11.2 l30 8v-11.2 z" fill="var(--c-line)"/><path d="M40 86l24 -8l22 8l-24 8z"/><path d="M40 86v15.4 l24 8v-15.4 z" fill="var(--c-line)"/><path d="M130 90l26 -8l24 8l-26 8z"/><path d="M130 90v16.8 l26 8v-16.8 z" fill="var(--c-line)"/><path d="M84 100l20 -8l18 8l-20 8z"/><path d="M84 100v12.6 l20 8v-12.6 z" fill="var(--c-line)"/><path d="M150 30l22 -8l20 8l-22 8z"/><path d="M150 30v14.0 l22 8v-14.0 z" fill="var(--c-line)"/></g><ellipse cx="100" cy="76" rx="38" ry="22" fill="none" stroke="var(--c-accent)" stroke-dasharray="3 3"/><ellipse cx="100" cy="76" rx="74" ry="44" fill="none" stroke="var(--c-accent)" stroke-dasharray="3 3" opacity=".7"/><path d="M100 76 L60 52 L138 56 L150 100" fill="none" stroke="var(--c-brand)" stroke-width="2.5" stroke-linecap="round"/><circle cx="60" cy="52" r="5" fill="#7a4f8f" stroke="#fff" stroke-width="1.5"/><circle cx="138" cy="56" r="5" fill="#8a5a3c" stroke="#fff" stroke-width="1.5"/><circle cx="150" cy="100" r="5" fill="#c0603a" stroke="#fff" stroke-width="1.5"/><circle cx="70" cy="104" r="5" fill="#3f7f4f" stroke="#fff" stroke-width="1.5"/><circle cx="124" cy="34" r="5" fill="#b4832c" stroke="#fff" stroke-width="1.5"/><path d="M94 82v-12a6 6 0 0 1 12 0v12z" fill="var(--c-brand)" stroke="var(--c-accent)" stroke-width="1.5"/></svg></div>
+            <div class="lp-float lp-stay">
+              <h4><i class="ic ic-sparkle"></i>Your stay, hour by hour</h4>
+              <div><time>08:30</time><b>Breakfast at the hotel</b><small>Included, downstairs</small></div>
+              <div><time>10:00</time><b>The Cat House</b><small>3 min walk</small></div>
+              <div><time>14:30</time><b>Alberta iela facades</b><small>About 20 min walk</small></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="lp-section ytf" id="watch">
+        <div class="ui-wrap">
+          <div class="ytf-in">
+            <div class="ytf-copy">
+              <h2>See ArviStay in about a minute</h2>
+              <p>A short video tour of what ArviStay does and how it works.</p>
+              <a class="ytf-link" href="https://www.youtube.com/watch?v=2Gm5T_OHFl0" target="_blank" rel="noopener"><svg viewBox="0 0 28 20" width="20" height="14" aria-hidden="true"><rect width="28" height="20" rx="5" fill="#FF0033"/><path d="M11.2 5.8v8.4l7.3-4.2z" fill="#fff"/></svg>Watch on YouTube &#8599;</a>
+            </div>
+            <div>
+              <div class="ytf-frame" anvil:dom-node="yt_frame">
+                <button type="button" class="ytf-cover" anvil:dom-node="yt_cover" aria-label="Play the ArviStay video (1:10)">
+                  <img src="_/theme/yt-cover.jpg" alt="" loading="lazy" decoding="async" width="960" height="540">
+                  <span class="ytf-play" aria-hidden="true"><svg viewBox="0 0 68 48" width="68" height="48"><path d="M66.5 7.7a8.5 8.5 0 0 0-6-6C55.3.3 34 .3 34 .3s-21.3 0-26.5 1.4a8.5 8.5 0 0 0-6 6C.1 13 .1 24 .1 24s0 11 1.4 16.3a8.5 8.5 0 0 0 6 6c5.2 1.4 26.5 1.4 26.5 1.4s21.3 0 26.5-1.4a8.5 8.5 0 0 0 6-6C67.9 35 67.9 24 67.9 24s0-11-1.4-16.3z" fill="#FF0033"/><path d="M45 24 27 14v20z" fill="#fff"/></svg></span>
+                  <span class="ytf-len">1:10</span>
+                </button>
+              </div>
+              <p class="ytf-note">The video loads from YouTube when you press play.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="lp-section" id="how">
+        <div class="ui-wrap">
+          <div class="lp-head"><h2>From an address to a website in an afternoon</h2><p>The slow part of a hotel website is explaining the neighbourhood. We do that part for you.</p></div>
+          <div class="lp-steps">
+          <div class="ui-card orn lp-step"><span class="num" aria-hidden="true">1</span><h3>Type your address</h3><p class="muted">We map the neighbourhood: places from OpenStreetMap, landmarks and photos from Wikipedia, all sorted by walking time from your door.</p></div>
+          <div class="ui-card orn lp-step"><span class="num" aria-hidden="true">2</span><h3>Pick your guests</h3><p class="muted">Thirty traveller profiles, ranked by how well your area suits each one. Every profile gets a stay planned hour by hour, automatically.</p></div>
+          <div class="ui-card orn lp-step"><span class="num" aria-hidden="true">3</span><h3>Add photos, publish</h3><p class="muted">Upload room photos, videos and 360° shots, adjust the texts we drafted, and publish to your own link. Or download it and host it anywhere.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="lp-section">
+        <div class="ui-wrap">
+          <div class="lp-head"><h2>Every guest gets their own stay</h2><p>Visitors tell your site who they are. It answers with the rooms, places and an hour-by-hour plan that fit them. Try it:</p></div>
+          <div class="lp-demo">
+            <div class="lp-who">
+              <anvil-component type="RepeatingPanel" name="who_panel" prop:item_template="Nouveau_Stay.Items.DemoWho" prop:role='["lp-who-list"]'></anvil-component>
+              <p class="small muted">Four of 30 profiles. Each site shows the ones its neighbourhood suits best.</p>
+            </div>
+            <div class="ui-card orn lp-plan">
+              <p class="small muted lp-plan-ex">Example: Hotel Kristofs, Riga</p>
+              <anvil-component type="Label" name="plan_title" prop:role='["lp-plan-title"]'></anvil-component>
+              <anvil-component type="Label" name="plan_line" prop:role='["fine-print"]'></anvil-component>
+              <anvil-component type="RepeatingPanel" name="plan_panel" prop:item_template="Nouveau_Stay.Items.PlanStep" prop:role='["lp-plan-list"]'></anvil-component>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="lp-section">
+        <div class="ui-wrap">
+          <div class="lp-head"><h2>Built to sell your neighbourhood</h2><p>Everything is included: no plugins to find, nothing to install.</p></div>
+          <div class="lp-feats">
+          <div class="lp-feature"><i class="ic ic-image"></i><h3>Video, or a film of your photos</h3><p>A video background, YouTube or Vimeo, or slow cinematic zooms made from your own photos.</p></div>
+          <div class="lp-feature"><i class="ic ic-refresh"></i><h3>360° photos and 3D tours</h3><p>A 360° viewer built in, Matterport or Kuula tours, and a "walk from our door" photo walk.</p></div>
+          <div class="lp-feature"><i class="ic ic-map"></i><h3>A 3D neighbourhood map</h3><p>3D buildings, rings at 5, 10 and 15 minutes on foot, and a camera that flies along a guest's day.</p></div>
+          <div class="lp-feature"><i class="ic ic-users"></i><h3>Thirty guest profiles</h3><p>Foodie, family, night owl, history buff… Guests pick one and the whole page rearranges itself.</p></div>
+          <div class="lp-feature"><i class="ic ic-calendar"></i><h3>The stay, written for them</h3><p>Arrival, days and departure, hour by hour, from real places near you, with your own tips and favourites.</p></div>
+          <div class="lp-feature"><i class="ic ic-shield"></i><h3>Booking and payment, explained</h3><p>Where to book, when to pay, house rules, and questions answered before guests ask.</p></div>
+          <div class="lp-feature"><i class="ic ic-grid"></i><h3>Galleries that look modern</h3><p>Bento, masonry, film strip or arched Art Nouveau frames, with a full-screen viewer.</p></div>
+          <div class="lp-feature"><i class="ic ic-globe"></i><h3>Your link or your own host</h3><p>Publish to your own link here, or download a folder with everything and put it on any web host.</p></div>
+          <div class="lp-feature"><i class="ic ic-search"></i><h3>Ready for search engines</h3><p>Titles, link previews and Google's hotel data are added for you.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="lp-section">
+        <div class="ui-wrap">
+          <div class="lp-head"><h2>Not another blank page</h2><p>Tired of website builders? Here is the difference.</p></div>
+          <div class="lp-vs">
+            <div class="ui-card"><h3><i class="ic ic-x"></i>A general website builder</h3><ul><li>A blank page and a thousand buttons</li><li>You write every word about the area</li><li>Plugins for maps, galleries and tours</li><li>Every guest sees the same page</li></ul></div>
+            <div class="ui-card orn"><h3><i class="ic ic-check"></i>ArviStay</h3><ul><li>Starts with your neighbourhood already mapped and written</li><li>3D map, 360° viewer, galleries and video built in</li><li>Each guest sees their own stay</li><li>Change a text and see it at once; publish in one click</li></ul></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="lp-section">
+        <div class="ui-wrap">
+          <div class="lp-head"><h2>Questions</h2></div>
+          <div class="lp-faq">
+          <details><summary>Can guests book on my site?</summary><p>Not directly, on purpose. Booking buttons send guests to Booking.com, Hotels.com, Expedia, your phone or your email, so your rooms and prices stay where you already manage them. The site explains how booking and payment work, so guests book with confidence.</p></details>
+          <details><summary>Where does the neighbourhood information come from?</summary><p>Places come from OpenStreetMap and landmarks from Wikipedia, sorted by walking time. You can hide places you don't recommend, star your favourites, add your own tips and add places we missed.</p></details>
+          <details><summary>How automatic is the stay story?</summary><p>Completely: choose a guest profile and the site writes their arrival, days and departure from the places around you, for 1 to 4 nights, in any season. You can add a tip, recommend rooms or leave things out.</p></details>
+          <details><summary>Can I use my own domain?</summary><p>Yes. Download the site and host it at your domain, or forward your domain to your link here.</p></details>
+          <details><summary>What does it cost?</summary><p>Nothing while ArviStay is in beta.</p></details>
+          <details><summary>Who owns the photos and texts?</summary><p>You do. You can delete them, or the whole site, at any time. The Privacy &amp; Terms page has the details.</p></details>
+          <details><summary>Does it work on phones?</summary><p>Every hotel site is designed for phones first. The editor works on a computer or a tablet, and in a pinch on a phone.</p></details>
+          </div>
+        </div>
+      </section>
+
+      <section class="lp-section">
+        <div class="ui-wrap">
+          <div class="lp-band">
+            <div><h2>Your neighbourhood is your best feature.</h2><p>Show it to every guest, the way they travel.</p></div>
+            <a class="ui-btn gold lg" href="#auth/signup" anvil:name="band_guest">Create your hotel site</a>
+            <a class="ui-btn gold lg" href="#new" anvil:name="band_member"><i class="ic ic-plus"></i>New site</a>
+          </div>
+        </div>
+      </section>
+    </div>
+  </anvil-block>
+</anvil-form>

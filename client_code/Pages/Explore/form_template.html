@@ -1,0 +1,17 @@
+<anvil-form layout="Nouveau_Stay.Layouts.Shell">
+  <anvil-block slot="content">
+    <div class="ui-wrap">
+      <div class="ex-head">
+        <h1>Hotels that sell the stay</h1>
+        <p class="muted">Every site below was made with ArviStay in an afternoon: rooms, a 3D neighbourhood map and a stay written for each kind of guest. Open one and pick who you are.</p>
+      </div>
+      <anvil-component type="RepeatingPanel" name="sites_panel" prop:item_template="Nouveau_Stay.Items.ExploreCard" prop:role='["ex-grid"]'></anvil-component>
+      <div class="ui-empty" anvil:name="empty">
+        <i class="ic ic-globe"></i>
+        <h2>No published sites yet</h2>
+        <p>Be the first.</p>
+      </div>
+      <div class="ex-cta" anvil:name="guest_cta"><a class="ui-btn primary lg" href="#auth/signup"><i class="ic ic-sparkle"></i>Make one for your hotel</a></div>
+    </div>
+  </anvil-block>
+</anvil-form>

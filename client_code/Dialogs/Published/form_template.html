@@ -1,0 +1,10 @@
+<div class="ui dlg">
+  <h2 class="dlg-h">Your site is live</h2>
+  <p class="muted">Share this link, put it on your booking profiles, or print it on a card at reception.</p>
+  <p class="dlg-url"><a anvil:name="link" target="_blank" rel="noopener"></a></p>
+  <div class="ui-row end">
+    <anvil-component type="Button" name="copy_button" prop:text="Copy link" prop:role='["btn", "ic-copy"]'></anvil-component>
+    <a class="ui-btn primary" anvil:name="open_link" target="_blank" rel="noopener"><i class="ic ic-external"></i>Open it</a>
+    <anvil-component type="Button" name="close_button" prop:text="Close" prop:role='["btn", "btn-ghost"]'></anvil-component>
+  </div>
+</div>

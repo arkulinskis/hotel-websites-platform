@@ -1,0 +1,102 @@
+<anvil-form layout="Nouveau_Stay.Layouts.Shell">
+  <anvil-block slot="content">
+    <div class="ui-wrap">
+      <div class="nw">
+        <div class="ui-page-head">
+          <div><anvil-component type="Label" name="title" prop:role='["page-title"]'></anvil-component></div>
+          <a class="ui-btn ghost" href="#sites"><i class="ic ic-x"></i>Cancel</a>
+        </div>
+        <div class="nw-steps" aria-label="Steps">
+          <span anvil:name="b0">Find your hotel</span><span anvil:name="b1">Scan the area</span><span anvil:name="b2">Your guests</span><span anvil:name="b3">Look &amp; facts</span>
+        </div>
+        <div class="ui-card orn nw-card">
+
+          <div anvil:name="s0">
+            <h2>Where is your hotel?</h2>
+            <p class="muted">We use the address to find everything around it: cafés, sights, museums, parks, stations.</p>
+            <div class="nw-grid2">
+              <label class="ui-field"><span>Hotel name</span><anvil-component type="TextBox" name="name_box" prop:placeholder="Hotel Riga Rose"></anvil-component></label>
+              <label class="ui-field"><span>Address</span><anvil-component type="TextBox" name="address_box" prop:placeholder="Teātra iela 6, Rīga"></anvil-component></label>
+            </div>
+            <div class="nw-find"><anvil-component type="Button" name="find_button" prop:text="Find the address" prop:role='["btn", "ic-search"]'></anvil-component></div>
+            <anvil-component type="RepeatingPanel" name="results_panel" prop:item_template="Nouveau_Stay.Items.AddrResult" prop:role='["nw-results"]'></anvil-component>
+            <anvil-component type="Label" name="no_results" prop:text="No address found. Try the street and city, e.g. &quot;Teātra iela 6, Rīga&quot;." prop:role='["msg-note", "nw-gap"]'></anvil-component>
+            <div anvil:name="map_box">
+              <anvil-component type="Nouveau_Stay.Components.HotelMap" name="map"></anvil-component>
+              <p class="muted small">Is the pin on your hotel? If not, pick another result or refine the address.</p>
+            </div>
+            <div class="nw-nav"><span></span><anvil-component type="Button" name="next0" prop:text="Scan the neighbourhood" prop:role='["btn", "btn-primary", "ic-arrow"]'></anvil-component></div>
+          </div>
+
+          <div anvil:name="s1">
+            <div class="nw-scan" anvil:name="scanning">
+              <div class="nw-orb" aria-hidden="true"><i class="ic ic-compass"></i></div>
+              <anvil-component type="Label" name="scan_title" prop:role='["sec-title"]'></anvil-component>
+              <anvil-component type="Label" name="scan_log" prop:text="Starting…" prop:role='["nw-log"]'></anvil-component>
+              <p class="muted small">Places from OpenStreetMap, landmarks and photos from Wikipedia. Usually 10 to 40 seconds.</p>
+            </div>
+            <div anvil:name="scanned">
+              <div class="nw-scan">
+                <anvil-component type="Label" name="found_title" prop:role='["sec-title"]'></anvil-component>
+                <p class="muted">Everything is sorted by walking time from your door. You can hide, pin or add places later.</p>
+                <anvil-component type="RepeatingPanel" name="cats_panel" prop:item_template="Nouveau_Stay.Items.CatCount" prop:role='["nw-cats"]'></anvil-component>
+                <div class="nw-lms" tabindex="0" aria-label="Landmarks nearby" anvil:name="lms_box">
+                  <anvil-component type="RepeatingPanel" name="lms_panel" prop:item_template="Nouveau_Stay.Items.Landmark" prop:role='["contents"]'></anvil-component>
+                </div>
+                <anvil-component type="Label" name="few_note" prop:text="Not much found nearby. Try a wider scan, or add your favourite places in the editor." prop:role='["msg-note"]'></anvil-component>
+              </div>
+              <div class="nw-nav">
+                <anvil-component type="Button" name="back1" prop:text="Back" prop:role='["btn", "btn-ghost", "ic-back"]'></anvil-component>
+                <span class="ui-row">
+                  <anvil-component type="Button" name="wider_button" prop:text="Scan wider (2 km)" prop:role='["btn", "ic-refresh"]'></anvil-component>
+                  <anvil-component type="Button" name="next1" prop:text="Choose your guests" prop:role='["btn", "btn-primary", "ic-arrow"]'></anvil-component>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div anvil:name="s2">
+            <h2>Who should your site speak to?</h2>
+            <p class="muted">Guests pick one of these on your site, and the page rearranges itself for them: rooms, places and a stay planned hour by hour. We ranked all 30 by how well your neighbourhood suits them and picked the best eight. Change it any time.</p>
+            <div class="ui-row nw-top">
+              <anvil-component type="Label" name="chosen_label" prop:role='["strong"]'></anvil-component>
+              <anvil-component type="Button" name="top8" prop:text="Best 8" prop:role='["btn", "btn-sm", "btn-ghost"]'></anvil-component>
+              <anvil-component type="Button" name="top12" prop:text="Best 12" prop:role='["btn", "btn-sm", "btn-ghost"]'></anvil-component>
+              <anvil-component type="Button" name="top0" prop:text="None" prop:role='["btn", "btn-sm", "btn-ghost"]'></anvil-component>
+            </div>
+            <anvil-component type="RepeatingPanel" name="pers_panel" prop:item_template="Nouveau_Stay.Items.PersonaPick" prop:role='["nw-pers"]'></anvil-component>
+            <div class="nw-nav">
+              <anvil-component type="Button" name="back2" prop:text="Back" prop:role='["btn", "btn-ghost", "ic-back"]'></anvil-component>
+              <anvil-component type="Button" name="next2" prop:text="Pick a look" prop:role='["btn", "btn-primary", "ic-arrow"]'></anvil-component>
+            </div>
+          </div>
+
+          <div anvil:name="s3">
+            <h2>Make it yours</h2>
+            <p class="muted">Six Art Nouveau looks, all made for phones first. You can change everything later.</p>
+            <div role="radiogroup" aria-label="Palette">
+              <anvil-component type="RepeatingPanel" name="pals_panel" prop:item_template="Nouveau_Stay.Items.PaletteCard" prop:role='["nw-pals"]'></anvil-component>
+            </div>
+            <div class="nw-grid2 nw-facts">
+              <label class="ui-field"><span>Typography</span><anvil-component type="DropDown" name="fonts_box"></anvil-component></label>
+              <label class="ui-field"><span>Kind of place</span><anvil-component type="DropDown" name="kind_box"></anvil-component></label>
+              <label class="ui-field"><span>Stars <em>(optional)</em></span><anvil-component type="DropDown" name="stars_box"></anvil-component></label>
+              <label class="ui-field"><span>One line about the hotel <em>(optional)</em></span><anvil-component type="TextBox" name="tagline_box" prop:placeholder="A quiet garden hotel near the old town"></anvil-component></label>
+              <label class="ui-field"><span>Check-in from</span><anvil-component type="TextBox" name="checkin_box" prop:text="15:00"></anvil-component></label>
+              <label class="ui-field"><span>Check-out until</span><anvil-component type="TextBox" name="checkout_box" prop:text="11:00"></anvil-component></label>
+              <label class="ui-field"><span>Phone <em>(optional)</em></span><anvil-component type="TextBox" name="phone_box"></anvil-component></label>
+              <label class="ui-field"><span>Email <em>(optional)</em></span><anvil-component type="TextBox" name="email_box"></anvil-component></label>
+            </div>
+            <h3 class="nw-h3">What do you offer?</h3>
+            <anvil-component type="RepeatingPanel" name="feats_panel" prop:item_template="Nouveau_Stay.Items.FeatureCheck" prop:role='["nw-feats"]'></anvil-component>
+            <div class="nw-nav">
+              <anvil-component type="Button" name="back3" prop:text="Back" prop:role='["btn", "btn-ghost", "ic-back"]'></anvil-component>
+              <anvil-component type="Button" name="create_button" prop:text="Create my site" prop:role='["btn", "btn-primary", "btn-lg", "ic-sparkle"]'></anvil-component>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </anvil-block>
+</anvil-form>

@@ -1,0 +1,22 @@
+<anvil-form layout="Nouveau_Stay.Layouts.Shell">
+  <anvil-block slot="content">
+    <div class="ui-wrap">
+      <div class="st-hello">
+        <div>
+          <anvil-component type="Label" name="hello" prop:role='["page-title"]'></anvil-component>
+          <anvil-component type="Label" name="sub" prop:role='["st-sub-line"]'></anvil-component>
+        </div>
+        <a class="ui-btn primary" href="#new"><i class="ic ic-plus"></i>New site</a>
+      </div>
+      <anvil-component type="RepeatingPanel" name="sites_panel" prop:item_template="Nouveau_Stay.Items.SiteCard" prop:role='["st-grid"]'></anvil-component>
+      <div anvil:name="managed_box">
+        <div class="st-sub"><i class="ic ic-shield"></i><h2>Sites you manage as admin</h2></div>
+        <anvil-component type="RepeatingPanel" name="managed_panel" prop:item_template="Nouveau_Stay.Items.SiteCard" prop:role='["st-grid"]'></anvil-component>
+      </div>
+      <div class="ui-card orn st-tip">
+        <i class="ic ic-bulb"></i>
+        <div><b>Booking stays with Booking.com and friends.</b><p class="muted small">Your site sells the stay; the booking buttons send guests to the sites you already use, so your rooms and prices stay in one place.</p></div>
+      </div>
+    </div>
+  </anvil-block>
+</anvil-form>

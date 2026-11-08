@@ -1,0 +1,19 @@
+<div class="ad-site">
+  <div class="ui-item">
+    <div class="meta">
+      <span anvil:dom-node="status"></span>
+      <span class="ui-badge brand" anvil:name="showcase_badge">Showcase</span>
+      <span class="ui-badge" anvil:name="demo_badge">Demo</span>
+      <span anvil:dom-node="views"></span><span anvil:dom-node="edited"></span>
+    </div>
+    <h3><span anvil:dom-node="name"></span> <span class="muted small" anvil:dom-node="city"></span></h3>
+    <p class="small muted"><span anvil:dom-node="owner"></span><span anvil:name="slug_box"> · <a anvil:name="slug_link" target="_blank" rel="noopener"></a></span></p>
+    <div class="ui-row ad-site-actions">
+      <a class="ui-btn sm primary" anvil:name="edit_link" href="#sites"><i class="ic ic-edit"></i>Edit</a>
+      <anvil-component type="Button" name="transfer_button" prop:text="Hand over" prop:role='["btn", "btn-sm", "ic-user"]'></anvil-component>
+      <anvil-component type="Button" name="status_button" prop:role='["btn", "btn-sm"]'></anvil-component>
+      <span class="ui-spacer"></span>
+      <anvil-component type="Button" name="delete_button" prop:text="Delete" prop:role='["btn", "btn-sm", "btn-danger", "ic-trash"]'></anvil-component>
+    </div>
+  </div>
+</div>

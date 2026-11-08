@@ -1,2 +1,2 @@
-"""Written by tools/sync_to_anvil.py (build_web): the version of web/site/*.js + *.css."""
-SITE_V = "3dd40a4df4"
+"""Written by tools/build_site.py: the version of site/*.js + *.css (hosted pages link ns-site.* with it)."""
+SITE_V = "021dcb7916"

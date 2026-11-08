@@ -352,52 +352,60 @@ metadata:
   title: 'ArviStay: Art Nouveau websites for small hotels'
 name: ArviStay
 native_deps:
-  head_html: "<script src=\"_/theme/legal-kit.js?v=4e51f2adf3\"></script>\n<!-- seo:start (APP_MAKER/seo: edit seo/apps/nouveaustay.json\
-    \ and run seo.py, not here) -->\n<link rel=\"canonical\" href=\"https://arvistay.com/\">\n<meta name=\"robots\" content=\"\
-    index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1\">\n<meta name=\"keywords\" content=\"hotel\
-    \ website builder, boutique hotel website, small hotel website, hotel website design, 360 tour hotel, neighbourhood map\
-    \ for hotels, direct booking website, guest itinerary, Art Nouveau design\">\n<meta name=\"author\" content=\"Arkvital\"\
-    >\n<meta property=\"og:type\" content=\"website\">\n<meta property=\"og:site_name\" content=\"ArviStay\">\n<meta property=\"\
-    og:title\" content=\"ArviStay: Art Nouveau websites for small hotels\">\n<meta property=\"og:description\" content=\"\
-    Make a beautiful Art Nouveau website for your hotel: rooms, videos, 360-degree tours, a 3D neighbourhood map and an hour-by-hour\
-    \ stay plan for every kind of guest.\">\n<meta property=\"og:locale\" content=\"en_CA\">\n<meta property=\"og:url\" content=\"\
-    https://arvistay.com/\">\n<meta property=\"og:image\" content=\"https://arvistay.com/_/theme/og-image.png\">\n<meta property=\"\
-    og:image:width\" content=\"1200\"><meta property=\"og:image:height\" content=\"630\">\n<meta property=\"og:image:alt\"\
-    \ content=\"ArviStay: Hotel websites that sell the stay\">\n<meta name=\"twitter:card\" content=\"summary_large_image\"\
-    >\n<meta name=\"twitter:title\" content=\"ArviStay: Art Nouveau websites for small hotels\">\n<meta name=\"twitter:description\"\
-    \ content=\"Make a beautiful Art Nouveau website for your hotel: rooms, videos, 360-degree tours, a 3D neighbourhood map\
-    \ and an hour-by-hour stay plan for every kind of guest.\">\n<meta name=\"twitter:image\" content=\"https://arvistay.com/_/theme/og-image.png\"\
-    >\n<link rel=\"alternate\" type=\"text/plain\" title=\"ArviStay for AI assistants\" href=\"https://arvistay.com/llms.txt\"\
-    >\n<script type=\"application/ld+json\">{\"@context\": \"https://schema.org\", \"@graph\": [{\"@type\": \"WebApplication\"\
-    , \"@id\": \"https://arvistay.com/#app\", \"name\": \"ArviStay\", \"url\": \"https://arvistay.com/\", \"description\"\
-    : \"Make a beautiful Art Nouveau website for your hotel: rooms, videos, 360-degree tours, a 3D neighbourhood map and an\
-    \ hour-by-hour stay plan for every kind of guest.\", \"image\": \"https://arvistay.com/_/theme/og-image.png\", \"inLanguage\"\
-    : \"en\", \"publisher\": {\"@id\": \"https://arkvital.com/#org\"}, \"keywords\": \"hotel website builder, boutique hotel\
-    \ website, small hotel website, hotel website design, 360 tour hotel, neighbourhood map for hotels, direct booking website,\
-    \ guest itinerary, Art Nouveau design\", \"applicationCategory\": \"BusinessApplication\", \"operatingSystem\": \"Any\
-    \ (web browser)\", \"browserRequirements\": \"Requires JavaScript and a modern web browser\", \"featureList\": [\"Type\
-    \ an address: the neighbourhood is mapped and the texts drafted\", \"30 guest profiles; the page rearranges for each one\"\
-    , \"An hour-by-hour stay plan with real places and walking times\", \"Rooms, videos, 360-degree tours and a 3D neighbourhood\
-    \ map\", \"Host the site here or download it\"], \"audience\": {\"@type\": \"Audience\", \"audienceType\": \"Owners of\
-    \ small and boutique hotels\"}}, {\"@type\": \"WebSite\", \"@id\": \"https://arvistay.com/#site\", \"url\": \"https://arvistay.com/\"\
-    , \"name\": \"ArviStay\", \"publisher\": {\"@id\": \"https://arkvital.com/#org\"}}, {\"@type\": \"Organization\", \"@id\"\
-    : \"https://arkvital.com/#org\", \"name\": \"Arkvital\", \"url\": \"https://arkvital.com\", \"email\": \"arkvital@outlook.com\"\
-    , \"address\": {\"@type\": \"PostalAddress\", \"addressLocality\": \"Montreal\", \"addressRegion\": \"QC\", \"addressCountry\"\
-    : \"CA\"}}]}</script>\n<!-- seo:end -->\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\"\
-    >\n<meta name=\"theme-color\" content=\"#1f5c55\">\n<meta name=\"apple-mobile-web-app-capable\" content=\"yes\">\n<link\
-    \ rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\"\
-    \ crossorigin>\n<link href=\"https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Federo&family=Jost:wght@400;500;600;700&display=swap\"\
-    \ rel=\"stylesheet\">\n<link id=\"ui-favicon\" rel=\"icon\" type=\"image/svg+xml\" href=\"_/theme/icon.svg?v=f0ba3cbd57\"\
-    >\n<link rel=\"apple-touch-icon\" href=\"_/theme/icon-180.png?v=f0ba3cbd57\">\n<script>\n/* Keep our tab icon: Anvil adds\
-    \ its own <link rel=\"icon\">, so drop any other icon link. */\n(function () {\n  function keep() {\n    var ours = document.getElementById('ui-favicon');\n\
-    \    if (!ours) return;\n    document.querySelectorAll('link[rel~=\"icon\"]').forEach(function (l) { if (l !== ours) l.remove();\
-    \ });\n  }\n  keep();\n  document.addEventListener('DOMContentLoaded', keep);\n  window.addEventListener('load', keep);\n\
-    })();\n</script>\n\n<!-- Prepsto feedback panel: every \"Submit feedback\" link and button opens it (it is the only feedback\
-    \ channel). No floating button, no cookies, nothing loads until it is opened. Codes: APP_MAKER/prepsto-links.json -->\n\
-    <script src=\"https://prepsto.com/_/theme/widget.js\" data-prepsto=\"uavfgu6\" data-button=\"false\" data-label=\"Submit\
-    \ feedback\" async></script>\n<script src=\"_/theme/ns-site.js?v=3dd40a4df4\"></script>\n<link rel=\"stylesheet\" href=\"\
-    _/theme/ns-site.css?v=3dd40a4df4\">\n<link rel=\"stylesheet\" href=\"_/theme/app.css?v=b6f22687f0\">\n<script src=\"_/theme/app.js?v=7994ab5fdb\"\
-    ></script>\n"
+  head_html: |
+    <script src="_/theme/legal-kit.js?v=4e51f2adf3"></script>
+    <!-- seo:start (APP_MAKER/seo: edit seo/apps/nouveaustay.json and run seo.py, not here) -->
+    <link rel="canonical" href="https://arvistay.com/">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <meta name="keywords" content="hotel website builder, boutique hotel website, small hotel website, hotel website design, 360 tour hotel, neighbourhood map for hotels, direct booking website, guest itinerary, Art Nouveau design">
+    <meta name="author" content="Arkvital">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="ArviStay">
+    <meta property="og:title" content="ArviStay: Art Nouveau websites for small hotels">
+    <meta property="og:description" content="Make a beautiful Art Nouveau website for your hotel: rooms, videos, 360-degree tours, a 3D neighbourhood map and an hour-by-hour stay plan for every kind of guest.">
+    <meta property="og:locale" content="en_CA">
+    <meta property="og:url" content="https://arvistay.com/">
+    <meta property="og:image" content="https://arvistay.com/_/theme/og-image.png">
+    <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="ArviStay: Hotel websites that sell the stay">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="ArviStay: Art Nouveau websites for small hotels">
+    <meta name="twitter:description" content="Make a beautiful Art Nouveau website for your hotel: rooms, videos, 360-degree tours, a 3D neighbourhood map and an hour-by-hour stay plan for every kind of guest.">
+    <meta name="twitter:image" content="https://arvistay.com/_/theme/og-image.png">
+    <link rel="alternate" type="text/plain" title="ArviStay for AI assistants" href="https://arvistay.com/llms.txt">
+    <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebApplication", "@id": "https://arvistay.com/#app", "name": "ArviStay", "url": "https://arvistay.com/", "description": "Make a beautiful Art Nouveau website for your hotel: rooms, videos, 360-degree tours, a 3D neighbourhood map and an hour-by-hour stay plan for every kind of guest.", "image": "https://arvistay.com/_/theme/og-image.png", "inLanguage": "en", "publisher": {"@id": "https://arkvital.com/#org"}, "keywords": "hotel website builder, boutique hotel website, small hotel website, hotel website design, 360 tour hotel, neighbourhood map for hotels, direct booking website, guest itinerary, Art Nouveau design", "applicationCategory": "BusinessApplication", "operatingSystem": "Any (web browser)", "browserRequirements": "Requires JavaScript and a modern web browser", "featureList": ["Type an address: the neighbourhood is mapped and the texts drafted", "30 guest profiles; the page rearranges for each one", "An hour-by-hour stay plan with real places and walking times", "Rooms, videos, 360-degree tours and a 3D neighbourhood map", "Host the site here or download it"], "audience": {"@type": "Audience", "audienceType": "Owners of small and boutique hotels"}}, {"@type": "WebSite", "@id": "https://arvistay.com/#site", "url": "https://arvistay.com/", "name": "ArviStay", "publisher": {"@id": "https://arkvital.com/#org"}}, {"@type": "Organization", "@id": "https://arkvital.com/#org", "name": "Arkvital", "url": "https://arkvital.com", "email": "arkvital@outlook.com", "address": {"@type": "PostalAddress", "addressLocality": "Montreal", "addressRegion": "QC", "addressCountry": "CA"}}]}</script>
+    <!-- seo:end -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#1f5c55">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Federo&family=Jost:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link id="ui-favicon" rel="icon" type="image/svg+xml" href="_/theme/icon.svg?v=c358055a19">
+    <link rel="apple-touch-icon" href="_/theme/icon-180.png?v=f227d18584">
+    <script>
+    /* Keep our tab icon: Anvil adds its own <link rel="icon">, so drop any other icon link. */
+    (function () {
+      function keep() {
+        var ours = document.getElementById('ui-favicon');
+        if (!ours) return;
+        document.querySelectorAll('link[rel~="icon"]').forEach(function (l) { if (l !== ours) l.remove(); });
+      }
+      keep();
+      document.addEventListener('DOMContentLoaded', keep);
+      window.addEventListener('load', keep);
+    })();
+    </script>
+
+    <!-- Prepsto feedback panel: every "Submit feedback" link and button opens it (it is the only feedback channel). No floating button, no cookies, nothing loads until it is opened. Codes: APP_MAKER/prepsto-links.json -->
+    <script src="https://prepsto.com/_/theme/widget.js" data-prepsto="uavfgu6" data-button="false" data-label="Submit feedback" async></script>
+    <link rel="stylesheet" href="_/theme/icons.css?v=610f8f72db">
+    <link rel="stylesheet" href="_/theme/ns-site.css?v=abac97d79d">
+    <link rel="stylesheet" href="_/theme/app.css?v=7274098350">
+    <script src="_/theme/app-kit.js?v=b4fc96f067"></script>
+    <script src="_/theme/ns-site.js?v=f4bd699e1b"></script>
+    <script src="_/theme/ns-app.js?v=48c5388344"></script>
+    <script src="_/theme/ns-editor.js?v=5c685a5b7c"></script>
 package_name: Nouveau_Stay
 runtime_options:
   client_version: '3'
@@ -425,5 +433,5 @@ services:
   server_config: {}
   source: /runtime/services/google.yml
 startup:
-  module: Main
-  type: form
+  module: startup
+  type: module

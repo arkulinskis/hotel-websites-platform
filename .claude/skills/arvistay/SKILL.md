@@ -14,9 +14,9 @@ and the site explains booking and payment. Sites are hosted at `<app>/_/api/s/<s
 **Where it lives:**
 - Folder `C:\Users\arkvi\Documents\CLAUDE\hotel-websites-platform-forms\` = the git clone of
   **github.com/arkulinskis/hotel-websites-platform**. "git" layout: the folder *is* the Anvil app; Anvil pulls `master`,
-  pushing is the deploy. Live: **https://arvistay.com** (custom domain). Converted to native Forms on branch `forms`
-  (Nov 2026); until the user merges it, master still runs the old JavaScript version from the old source folder
-  `hotel-websites-platform` (tools/deploy.py there; don't deploy from it after the merge).
+  pushing is the deploy. Live: **https://arvistay.com** (custom domain). Native Forms on master since
+  2026-11-08 (forms branch merged). The old source folder `hotel-websites-platform` is retired (RETIRED.md; its
+  deploy.py refuses to run): never deploy from it.
 - Target patterns: `APP_MAKER\template-forms` (its guide), Anvil's `client-forms` skill (APP_MAKER/vendor).
 - **APP_MAP.md** is the code map (pages, server functions, who calls what). **README.md** lists every feature.
 
@@ -36,7 +36,7 @@ must fit 390px. Claude builds, tests and deploys; the user does the Anvil side.
 4. `python -I tools/ui_test.py --only smoke.js` (Docker Desktop running) -> every page address opens (guest, member with a
    site, admin), no JS/Python error, not empty. Container `nouveaustay-dev`; client edits apply on the next run, server
    edits need `--restart`; `--stop` at the end. The user does the full tests themselves.
-5. Commit as arkulinskis with the Co-Authored-By line; push (master once merged). New tables/columns: tell the user to
+5. Commit as arkulinskis with the Co-Authored-By line; push to master. New tables/columns: tell the user to
    accept the **Schema Mismatch** alert ("The schema of the source code is correct").
 6. `python -I C:/Users/arkvi/Documents/CLAUDE/APP_MAKER/standard/app_map.py nouveaustay --folder=<this folder>` refreshes APP_MAP.md.
 

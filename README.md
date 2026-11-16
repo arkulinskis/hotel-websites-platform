@@ -49,7 +49,7 @@ Built on [Anvil](https://anvil.works). The first site is **Boutique Hotel Kristo
 **For everyone:** landing page for hotel owners (with a small "what your guests see" demo), Explore (all published sites),
 sign-up, feedback form, Privacy & Terms (`#legal`).
 
-**For admins** (`#admin`; arkulinskis@gmail.com becomes an admin on first sign-in):
+**For admins** (`#admin`; your admin email (App Secret `admin_emails`) becomes an admin on first sign-in):
 - **Sites:** every site; edit, publish/unpublish, delete, **hand over** to an email (it waits until that person signs up).
 - The Hotel Kristofs showcase has no owner until handed over; admins can edit it from `#sites` ("Sites you manage").
 - **Feedback inbox**, **Users**, **Demo data** (two fictional demo hotels with made-up visit stats; removing the demo keeps
@@ -60,7 +60,7 @@ sign-up, feedback form, Privacy & Terms (`#legal`).
 1. In the Anvil editor: **Create app → Clone from GitHub**, and paste `https://github.com/arkulinskis/hotel-websites-platform`.
 2. **Users** service: email + password and "Continue with Google", sign-up allowed (already set in `anvil.yaml`; check it).
 3. Open the app in the editor. If it shows a **Schema Mismatch** alert, choose **"The schema of the source code is correct"** so Anvil creates the tables.
-4. **Run** it and sign up with **arkulinskis@gmail.com** straight away (that account becomes the admin).
+4. **Run** it and sign up with **your admin email** (App Secret `admin_emails`) straight away (that account becomes the admin).
 5. **Publish** (Publish → public URL, or your own domain).
 6. To give Hotel Kristofs to its owner: Admin → Sites → Hand over → their email.
 

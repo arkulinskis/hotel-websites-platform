@@ -72,7 +72,7 @@
     await check('#sites');
     // admin
     await signOut();
-    await signUpOrIn('arkulinskis@gmail.com', 'Nv-local-7qLp2-Xr9k', 'Admin Tester');
+    await signUpOrIn('admin@example.com', 'Nv-local-7qLp2-Xr9k', 'Admin Tester');
     for (const h of ['#admin', '#admin/sites', '#admin/feedback', '#admin/users', '#admin/demo', '#sites']) await check(h);
     log.push(bad.length ? 'PROBLEMS: ' + bad.join(' | ') : 'PASSED');
     return { ok: !bad.length, log: log };

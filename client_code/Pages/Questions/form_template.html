@@ -1,4 +1,4 @@
-<anvil-form layout="Nouveau_Stay.Layouts.Shell">
+<anvil-form layout="Arvistay.Layouts.Shell">
   <anvil-block slot="content">
     <div class="ui-wrap">
       <div class="qs-head">
@@ -6,7 +6,7 @@
         <p class="muted">What guests asked on your hotel sites. Reply by email, and turn the good ones into answers on your site with Add to FAQ.</p>
       </div>
       <div class="ui-row qs-filter">
-        <div class="ui-seg" role="group" aria-label="Show">
+        <div role="group" aria-label="Show" class="ui-seg">
           <anvil-component type="Button" name="f_new" prop:text="New" prop:role='["seg"]'></anvil-component>
           <anvil-component type="Button" name="f_answered" prop:text="Answered" prop:role='["seg"]'></anvil-component>
           <anvil-component type="Button" name="f_archived" prop:text="Archived" prop:role='["seg"]'></anvil-component>
@@ -14,7 +14,7 @@
         </div>
         <anvil-component type="DropDown" name="site_select" prop:role='["qs-site"]'></anvil-component>
       </div>
-      <anvil-component type="RepeatingPanel" name="questions_panel" prop:item_template="Nouveau_Stay.Items.QuestionRow" prop:role='["qs-list"]'></anvil-component>
+      <anvil-component type="RepeatingPanel" name="questions_panel" prop:item_template="Arvistay.Items.QuestionRow" prop:role='["qs-list"]'></anvil-component>
       <div class="ui-empty" anvil:name="empty">
         <i class="ic ic-inbox"></i>
         <h2 anvil:dom-node="empty_title">No new questions</h2>
@@ -23,7 +23,7 @@
       <div class="ui-card orn qs-tip">
         <i class="ic ic-bulb"></i>
         <div><b>Where questions come from</b>
-          <p class="muted small">Every published site has an "Ask us a question" form next to the directions, in every language the site speaks. We email you when one arrives (at most once every 30 minutes per site). You can switch the form off in the editor, Hotel tab.</p></div>
+        <p class="muted small">Every published site has an "Ask us a question" form next to the directions, in every language the site speaks. We email you when one arrives (at most once every 30 minutes per site). You can switch the form off in the editor, Hotel tab.</p></div>
       </div>
     </div>
   </anvil-block>

@@ -1,0 +1,566 @@
+/* Part 1b: languages. A hotel site is written in English and can also be shown in Latvian, Russian and German.
+
+     NS.LANGS            the languages a site can offer (code -> {name, short, locale})
+     NS.lang             the language the page is drawn in now ('en' unless the guest or the page picked another)
+     NS.t(s, vars)       the site's own words (buttons, headings, the automatic stay plan): s is the English text,
+                         looked up in DICT below; {name} placeholders are filled from vars (plain text)
+     NS.th(s, vars)      the same, HTML-escaped, with vars that are already HTML (for <b>…</b> inside a sentence)
+     NS.tr(s)            the owner's own texts (story, rooms, FAQ…): their translation in data.i18n[lang][english],
+                         else DICT (default kinds/titles), else the English as written
+     NS.siteLangs(data)  ['en'] + the languages the owner switched on (data.langs)
+     NS.setLang(code, data)
+   Translations of the owner's texts are keyed by the English text itself, so a changed English sentence simply
+   shows in English until it is translated again (no wrong, out-of-date translation). The editor's Languages tab
+   (theme/assets/ns-editor.js) fills data.i18n.
+   DICT: English -> [Latvian, Russian, German]. Place names are never declined: the sentences are built so a name
+   can stand as it is ("Kafija: X", «X»). Add a line here for every new English string the renderer shows. */
+(function () {
+  'use strict';
+  var NS = window.NSSite;
+  NS.LANGS = {
+    en: { name: 'English', short: 'EN', locale: 'en_GB' },
+    lv: { name: 'Latviešu', short: 'LV', locale: 'lv_LV' },
+    ru: { name: 'Русский', short: 'RU', locale: 'ru_RU' },
+    de: { name: 'Deutsch', short: 'DE', locale: 'de_DE' }
+  };
+  NS.LANG_ORDER = ['en', 'lv', 'ru', 'de'];
+  NS.lang = 'en';
+  var IDX = { lv: 0, ru: 1, de: 2 };
+  var owner = {};   // data.i18n[NS.lang] of the site being drawn
+
+  var DICT = {
+    /* ---------------------------------------------------------------- frame */
+    "Rooms": ["Numuri", "Номера", "Zimmer"],
+    "Your stay": ["Jūsu brauciens", "Ваша поездка", "Ihr Aufenthalt"],
+    "Neighbourhood": ["Apkārtne", "Окрестности", "Umgebung"],
+    "Booking": ["Rezervācija", "Бронирование", "Buchung"],
+    "Book": ["Rezervēt", "Забронировать", "Buchen"],
+    "Menu": ["Izvēlne", "Меню", "Menü"],
+    "Contact": ["Kontakti", "Контакты", "Kontakt"],
+    "Language": ["Valoda", "Язык", "Sprache"],
+    "Show everything": ["Rādīt visu", "Показать всё", "Alles zeigen"],
+    "Photo and data credits": ["Foto un datu avoti", "Источники фото и данных", "Foto- und Datenquellen"],
+    "Website made with {platform}": ["Mājaslapa veidota ar {platform}", "Сайт создан в {platform}", "Website erstellt mit {platform}"],
+    "Scroll down": ["Ritināt uz leju", "Прокрутить вниз", "Nach unten scrollen"],
+    "Hotel": ["Viesnīca", "Отель", "Hotel"],
+    "Your hotel": ["Jūsu viesnīca", "Ваш отель", "Ihr Hotel"],
+    "Close": ["Aizvērt", "Закрыть", "Schließen"],
+    "Previous": ["Iepriekšējā", "Назад", "Zurück"],
+    "Next": ["Nākamā", "Вперёд", "Weiter"],
+
+    /* ---------------------------------------------------------------- hero + profiles */
+    "Check availability": ["Pārbaudīt pieejamību", "Проверить наличие мест", "Verfügbarkeit prüfen"],
+    "Plan your stay": ["Plānot braucienu", "Спланировать поездку", "Aufenthalt planen"],
+    "For {who}:": ["Ja esat {who}:", "Если вы — {who}:", "Als {who}:"],
+    "Made for you": ["Veidots jums", "Специально для вас", "Für Sie gemacht"],
+    "Who is coming?": ["Kas brauc?", "Кто едет?", "Wer kommt?"],
+    "Pick the traveller you are. The whole page rearranges itself: rooms, places, and a stay planned hour by hour.": [
+      "Izvēlieties, kāds ceļotājs esat. Visa lapa pielāgojas jums: numuri, vietas un brauciens, saplānots pa stundām.",
+      "Выберите, какой вы путешественник. Вся страница подстроится под вас: номера, места и поездка, расписанная по часам.",
+      "Wählen Sie, welcher Reisetyp Sie sind. Die ganze Seite passt sich an: Zimmer, Orte und ein Aufenthalt, Stunde für Stunde geplant."],
+    "Choose your kind of trip": ["Izvēlieties brauciena veidu", "Выберите тип поездки", "Wählen Sie Ihre Art zu reisen"],
+    "Everyone": ["Visiem", "Для всех", "Alle"],
+    "Show me everything": ["Parādiet man visu", "Покажите мне всё", "Alles anzeigen"],
+    "Showing the site for {who}.": ["Lapa parādīta: {who}.", "Сайт показан для: {who}.", "Die Seite für: {who}."],
+    "See your stay": ["Skatīt jūsu braucienu", "Посмотреть вашу поездку", "Ihren Aufenthalt ansehen"],
+
+    /* ---------------------------------------------------------------- sections */
+    "Our story": ["Mūsu stāsts", "Наша история", "Unsere Geschichte"],
+    "Welcome": ["Laipni lūdzam", "Добро пожаловать", "Willkommen"],
+    "Why stay here": ["Kāpēc šeit", "Почему здесь", "Warum hier"],
+    "The best address in the neighbourhood": ["Labākā adrese apkārtnē", "Лучший адрес в округе", "Die beste Adresse im Viertel"],
+    "for you": ["jums", "для вас", "für Sie"],
+    "Sleep well": ["Labu nakti", "Спокойной ночи", "Gut schlafen"],
+    "Rooms are coming soon.": ["Numuri drīzumā būs redzami.", "Номера скоро появятся.", "Die Zimmer folgen in Kürze."],
+    "{room} photo {n}": ["{room}, foto {n}", "{room}, фото {n}", "{room}, Foto {n}"],
+    "Previous photo": ["Iepriekšējā foto", "Предыдущее фото", "Vorheriges Foto"],
+    "Next photo": ["Nākamā foto", "Следующее фото", "Nächstes Foto"],
+    "Photos coming soon": ["Foto drīzumā", "Фото скоро", "Fotos folgen"],
+    "Drawing of the room": ["Numura zīmējums", "Рисунок номера", "Zeichnung des Zimmers"],
+    "Up to {n}": ["Līdz {n}", "До {n}", "Bis {n}"],
+    "{n} photos": ["{n} foto", "Фото: {n}", "{n} Fotos"],
+    "3D tour": ["3D tūre", "3D-тур", "3D-Rundgang"],
+    "Video": ["Video", "Видео", "Video"],
+    "Perfect for you": ["Ideāli jums", "Идеально для вас", "Perfekt für Sie"],
+    "from {price} / night": ["no {price} / nakts", "от {price} / ночь", "ab {price} / Nacht"],
+    "Check dates": ["Pārbaudīt datumus", "Проверить даты", "Termine prüfen"],
+    "Tour {n}": ["Tūre {n}", "Тур {n}", "Rundgang {n}"],
+    "Drag to look around": ["Velciet, lai paskatītos apkārt", "Потяните, чтобы осмотреться", "Ziehen, um sich umzusehen"],
+    "Full screen": ["Pilnekrāns", "Во весь экран", "Vollbild"],
+    "Virtual tour": ["Virtuālā tūre", "Виртуальный тур", "Virtueller Rundgang"],
+    "Back": ["Atpakaļ", "Назад", "Zurück"],
+    "Walk on": ["Iet tālāk", "Идти дальше", "Weitergehen"],
+    "Look around": ["Paskatieties apkārt", "Осмотритесь", "Schauen Sie sich um"],
+    "Step inside": ["Ienāciet", "Заходите", "Treten Sie ein"],
+    "{room}: drag to look around.": ["{room}: velciet, lai paskatītos apkārt.", "{room}: потяните, чтобы осмотреться.", "{room}: ziehen, um sich umzusehen."],
+    "Gallery": ["Galerija", "Галерея", "Galerie"],
+    "A closer look": ["Tuvāk", "Поближе", "Genauer hingesehen"],
+    "Your stay, planned": ["Jūsu brauciens, saplānots", "Ваша поездка, уже спланирована", "Ihr Aufenthalt, geplant"],
+    "Your stay, hour by hour": ["Jūsu brauciens pa stundām", "Ваша поездка по часам", "Ihr Aufenthalt, Stunde für Stunde"],
+    "Written for the way you travel, from the places around us. Change the trip and watch it rewrite itself.": [
+      "Uzrakstīts tieši jūsu ceļošanas veidam, no vietām mums apkārt. Mainiet braucienu, un plāns pārrakstīsies pats.",
+      "Написано под ваш стиль путешествий, по местам вокруг нас. Измените поездку, и план перепишется сам.",
+      "Geschrieben für Ihre Art zu reisen, aus den Orten rund um uns. Ändern Sie die Reise, und der Plan schreibt sich neu."],
+    "Travelling as": ["Ceļoju kā", "Я путешествую как", "Ich reise als"],
+    "Nights": ["Naktis", "Ночей", "Nächte"],
+    "Season": ["Sezona", "Сезон", "Jahreszeit"],
+    "Day {n}": ["{n}. diena", "День {n}", "Tag {n}"],
+    "Show on map": ["Rādīt kartē", "Показать на карте", "Auf der Karte zeigen"],
+    "Google Maps": ["Google Maps", "Google Карты", "Google Maps"],
+    "Walk this day on the map": ["Izstaigāt šo dienu kartē", "Пройти этот день по карте", "Diesen Tag auf der Karte ablaufen"],
+    "Our pick for you: {room}": ["Mūsu izvēle jums: {room}", "Наш выбор для вас: {room}", "Unsere Wahl für Sie: {room}"],
+    "Book this stay": ["Rezervēt šo braucienu", "Забронировать эту поездку", "Diesen Aufenthalt buchen"],
+    "The neighbourhood": ["Apkārtne", "Окрестности", "Die Umgebung"],
+    "Everything is a short walk away": ["Viss ir pāris soļu attālumā", "Всё в нескольких шагах", "Alles ist nur ein paar Schritte entfernt"],
+    "Drag to turn · tap a pin for details": ["Velciet, lai pagrieztu · pieskarieties punktam", "Потяните, чтобы повернуть · нажмите на точку", "Ziehen zum Drehen · Punkt antippen für Details"],
+    "All": ["Visi", "Все", "Alle"],
+    "No places in this filter yet.": ["Šajā filtrā vietu vēl nav.", "В этом фильтре пока нет мест.", "In diesem Filter gibt es noch keine Orte."],
+    "{n} min": ["{n} min", "{n} мин", "{n} Min."],
+    "min": ["min", "мин", "Min."],
+    "Read more": ["Lasīt vairāk", "Читать дальше", "Mehr lesen"],
+    "Watch": ["Skatieties", "Смотрите", "Ansehen"],
+    "See it for yourself": ["Pārliecinieties paši", "Убедитесь сами", "Überzeugen Sie sich selbst"],
+    "Video {n}": ["Video {n}", "Видео {n}", "Video {n}"],
+    "Eat & drink": ["Ēst un dzert", "Еда и напитки", "Essen & Trinken"],
+    "See the menu": ["Skatīt ēdienkarti", "Посмотреть меню", "Zur Speisekarte"],
+    "Reserve a table": ["Rezervēt galdiņu", "Забронировать столик", "Tisch reservieren"],
+    "Guests say": ["Viesi saka", "Гости говорят", "Gäste sagen"],
+    "Loved by our guests": ["Mūsu viesu iecienīta", "Любимый отель наших гостей", "Von unseren Gästen geliebt"],
+    "{n} reviews": ["{n} atsauksmes", "Отзывов: {n}", "{n} Bewertungen"],
+    "A guest": ["Viesis", "Гость", "Ein Gast"],
+    "Book with confidence": ["Rezervējiet droši", "Бронируйте спокойно", "Sicher buchen"],
+    "How booking and payment work": ["Kā notiek rezervācija un apmaksa", "Как работают бронирование и оплата", "So funktionieren Buchung und Bezahlung"],
+    "Choose your dates": ["Izvēlieties datumus", "Выберите даты", "Wählen Sie Ihre Daten"],
+    "Check prices and availability on the booking site you trust, or contact us directly.": [
+      "Pārbaudiet cenas un brīvos numurus savā uzticamajā rezervāciju vietnē vai sazinieties ar mums tieši.",
+      "Проверьте цены и наличие мест на привычном сайте бронирования или свяжитесь с нами напрямую.",
+      "Prüfen Sie Preise und Verfügbarkeit auf der Buchungsseite Ihres Vertrauens oder kontaktieren Sie uns direkt."],
+    "Pay the way you like": ["Maksājiet, kā jums ērtāk", "Оплачивайте как удобно", "Bezahlen Sie, wie Sie möchten"],
+    "You pay when you book or at the hotel, depending on the rate you choose.": [
+      "Jūs maksājat rezervējot vai viesnīcā, atkarībā no izvēlētā tarifa.",
+      "Вы платите при бронировании или в отеле, в зависимости от выбранного тарифа.",
+      "Sie bezahlen bei der Buchung oder im Hotel, je nach gewähltem Tarif."],
+    "Arrive and relax": ["Ierodieties un atpūtieties", "Приезжайте и отдыхайте", "Ankommen und entspannen"],
+    "Check-in from {in}, check-out until {out}. We will have your room ready.": [
+      "Reģistrācija no {in}, izrakstīšanās līdz {out}. Jūsu numurs būs gatavs.",
+      "Заезд с {in}, выезд до {out}. Ваш номер будет готов.",
+      "Check-in ab {in}, Check-out bis {out}. Ihr Zimmer wartet auf Sie."],
+    "Good to know": ["Noderīgi zināt", "Полезно знать", "Gut zu wissen"],
+    "Questions guests ask": ["Viesu jautājumi", "Вопросы гостей", "Fragen unserer Gäste"],
+    "Didn't find your answer?": ["Neatradāt atbildi?", "Не нашли ответ?", "Keine Antwort gefunden?"],
+    "Ask us": ["Jautājiet mums", "Спросите нас", "Fragen Sie uns"],
+    "Find us": ["Kā mūs atrast", "Как нас найти", "So finden Sie uns"],
+    "Getting here": ["Kā nokļūt", "Как добраться", "Anreise"],
+    "Directions": ["Maršruts", "Маршрут", "Route"],
+
+    /* ---------------------------------------------------------------- the question form */
+    "Ask us a question": ["Uzdodiet mums jautājumu", "Задайте нам вопрос", "Stellen Sie uns eine Frage"],
+    "We usually answer within a day, by email.": ["Parasti atbildam dienas laikā, pa e-pastu.", "Обычно мы отвечаем в течение дня по электронной почте.", "Wir antworten meist innerhalb eines Tages per E-Mail."],
+    "Your name": ["Jūsu vārds", "Ваше имя", "Ihr Name"],
+    "Your email": ["Jūsu e-pasts", "Ваш e-mail", "Ihre E-Mail"],
+    "Your question": ["Jūsu jautājums", "Ваш вопрос", "Ihre Frage"],
+    "Send question": ["Sūtīt jautājumu", "Отправить вопрос", "Frage senden"],
+    "Sending…": ["Sūta…", "Отправка…", "Wird gesendet…"],
+    "Thank you! {hotel} will answer you by email soon.": ["Paldies! {hotel} drīz jums atbildēs pa e-pastu.", "Спасибо! {hotel} скоро ответит вам по электронной почте.", "Danke! {hotel} antwortet Ihnen bald per E-Mail."],
+    "Ask another question": ["Uzdot vēl vienu jautājumu", "Задать ещё вопрос", "Noch eine Frage stellen"],
+    "Your message goes only to {hotel}, who use your email to reply.": [
+      "Jūsu ziņa nonāk tikai pie {hotel}, un jūsu e-pasts tiek izmantots tikai atbildei.",
+      "Ваше сообщение получит только {hotel}; ваш e-mail нужен лишь для ответа.",
+      "Ihre Nachricht geht nur an {hotel}; Ihre E-Mail wird nur für die Antwort verwendet."],
+    "Please check your email address.": ["Lūdzu, pārbaudiet e-pasta adresi.", "Пожалуйста, проверьте адрес e-mail.", "Bitte prüfen Sie Ihre E-Mail-Adresse."],
+    "Please write a little more.": ["Lūdzu, uzrakstiet nedaudz vairāk.", "Пожалуйста, напишите чуть подробнее.", "Bitte schreiben Sie etwas mehr."],
+    "Too many questions right now. Please try again later, or email us.": [
+      "Pašlaik pārāk daudz jautājumu. Lūdzu, mēģiniet vēlāk vai rakstiet mums e-pastu.",
+      "Сейчас слишком много вопросов. Попробуйте позже или напишите нам на e-mail.",
+      "Gerade sind es zu viele Fragen. Bitte versuchen Sie es später oder schreiben Sie uns eine E-Mail."],
+    "Sorry, the question could not be sent. Please email us instead.": [
+      "Atvainojiet, jautājumu neizdevās nosūtīt. Lūdzu, rakstiet mums e-pastu.",
+      "Извините, вопрос не удалось отправить. Пожалуйста, напишите нам на e-mail.",
+      "Leider konnte die Frage nicht gesendet werden. Bitte schreiben Sie uns eine E-Mail."],
+    "The form works on the published site.": ["Forma darbojas publicētajā lapā.", "Форма работает на опубликованном сайте.", "Das Formular funktioniert auf der veröffentlichten Seite."],
+
+    /* ---------------------------------------------------------------- the reception QR card (ns-app.js NSApp.qrCard) */
+    "Scan to plan your stay": ["Skenējiet un plānojiet braucienu", "Отсканируйте и спланируйте поездку", "Scannen und Aufenthalt planen"],
+    "Your stay hour by hour, the neighbourhood map, and a place to ask us anything.": [
+      "Jūsu brauciens pa stundām, apkārtnes karte un vieta, kur uzdot mums jebkuru jautājumu.",
+      "Ваша поездка по часам, карта окрестностей и место, где можно задать нам любой вопрос.",
+      "Ihr Aufenthalt Stunde für Stunde, die Karte der Umgebung und ein Ort für all Ihre Fragen."],
+
+    /* ---------------------------------------------------------------- widgets */
+    "This 360° photo could not be loaded.": ["Šo 360° foto neizdevās ielādēt.", "Не удалось загрузить фото 360°.", "Dieses 360°-Foto konnte nicht geladen werden."],
+    "Open in Google Maps": ["Atvērt Google Maps", "Открыть в Google Картах", "In Google Maps öffnen"],
+    "Map of places around the hotel": ["Vietu karte ap viesnīcu", "Карта мест вокруг отеля", "Karte der Orte rund um das Hotel"],
+    "Illustrated map: directions are true, distances are walking minutes.": [
+      "Zīmēta karte: virzieni ir precīzi, attālumi ir minūtes kājām.",
+      "Рисованная карта: направления точные, расстояния в минутах пешком.",
+      "Gezeichnete Karte: Richtungen stimmen, Entfernungen sind Gehminuten."],
+    "Hotel video": ["Viesnīcas video", "Видео отеля", "Hotelvideo"],
+    "Room video": ["Numura video", "Видео номера", "Zimmervideo"],
+
+    /* ---------------------------------------------------------------- walking, seasons, numbers */
+    "1 min walk": ["1 min kājām", "1 мин пешком", "1 Min. zu Fuß"],
+    "{n} min walk": ["{n} min kājām", "{n} мин пешком", "{n} Min. zu Fuß"],
+    "{n} min by tram or taxi": ["{n} min ar tramvaju vai taksi", "{n} мин на трамвае или такси", "{n} Min. mit Tram oder Taxi"],
+    "Winter": ["Ziema", "Зима", "Winter"],
+    "Spring": ["Pavasaris", "Весна", "Frühling"],
+    "Summer": ["Vasara", "Лето", "Sommer"],
+    "Autumn": ["Rudens", "Осень", "Herbst"],
+    "on foot to {place}": ["kājām līdz {place}", "пешком до «{place}»", "zu Fuß zu {place}"],
+    "{things} within 10 minutes": ["{things} 10 minūšu attālumā", "{things} в 10 минутах", "{things} in 10 Minuten"],
+    "to {place}": ["līdz {place}", "до «{place}»", "zu {place}"],
+    "places within 15 minutes on foot": ["vietas 15 minūšu gājienā", "мест в 15 минутах пешком", "Orte in 15 Minuten zu Fuß"],
+
+    /* ---------------------------------------------------------------- place kinds: label, plural */
+    "Sight": ["Apskates vieta", "Достопримечательность", "Sehenswürdigkeit"],
+    "sights": ["apskates vietas", "достопримечательности", "Sehenswürdigkeiten"],
+    "Museum": ["Muzejs", "Музей", "Museum"],
+    "museums": ["muzeji", "музеи", "Museen"],
+    "galleries": ["galerijas", "галереи", "Galerien"],
+    "Church": ["Baznīca", "Церковь", "Kirche"],
+    "churches": ["baznīcas", "церкви", "Kirchen"],
+    "Stage & screen": ["Skatuve un kino", "Сцена и кино", "Bühne & Kino"],
+    "theatres & concert halls": ["teātri un koncertzāles", "театры и концертные залы", "Theater & Konzertsäle"],
+    "Café": ["Kafejnīca", "Кафе", "Café"],
+    "cafés": ["kafejnīcas", "кафе", "Cafés"],
+    "Restaurant": ["Restorāns", "Ресторан", "Restaurant"],
+    "restaurants": ["restorāni", "рестораны", "Restaurants"],
+    "Bar": ["Bārs", "Бар", "Bar"],
+    "bars & pubs": ["bāri un krodziņi", "бары и пабы", "Bars & Kneipen"],
+    "Nightlife": ["Naktsdzīve", "Ночная жизнь", "Nachtleben"],
+    "clubs & late venues": ["klubi un vēlās vietas", "клубы и ночные заведения", "Clubs & Nachtlokale"],
+    "Park": ["Parks", "Парк", "Park"],
+    "parks & gardens": ["parki un dārzi", "парки и сады", "Parks & Gärten"],
+    "Shop": ["Veikals", "Магазин", "Geschäft"],
+    "shops & boutiques": ["veikali un butiki", "магазины и бутики", "Geschäfte & Boutiquen"],
+    "Market & food shop": ["Tirgus un pārtika", "Рынок и продукты", "Markt & Feinkost"],
+    "markets & food shops": ["tirgi un pārtikas veikali", "рынки и продуктовые лавки", "Märkte & Feinkostläden"],
+    "Wellness": ["Labsajūta", "Велнес", "Wellness"],
+    "spas & wellness": ["spa un labsajūta", "спа и велнес", "Spas & Wellness"],
+    "Sport": ["Sports", "Спорт", "Sport"],
+    "gyms & sport": ["sporta zāles un sports", "спортзалы и спорт", "Fitness & Sport"],
+    "For kids": ["Bērniem", "Для детей", "Für Kinder"],
+    "places for kids": ["vietas bērniem", "места для детей", "Orte für Kinder"],
+    "Coworking": ["Kopstrādes telpa", "Коворкинг", "Coworking"],
+    "coworking spaces": ["kopstrādes telpas", "коворкинги", "Coworking-Spaces"],
+    "Transport": ["Transports", "Транспорт", "Verkehr"],
+    "stations & stops": ["stacijas un pieturas", "вокзалы и остановки", "Bahnhöfe & Haltestellen"],
+    "Essentials": ["Ikdienas lietas", "Самое нужное", "Das Nötigste"],
+    "pharmacies & ATMs": ["aptiekas un bankomāti", "аптеки и банкоматы", "Apotheken & Geldautomaten"],
+
+    /* place verbs ({n} = the place's name, never declined) */
+    "See {n}": ["Apskatiet: {n}", "Посмотрите «{n}»", "Sehen Sie {n}"],
+    "Stand in front of {n}": ["Pastāviet pie: {n}", "Постойте у «{n}»", "Stehen Sie vor {n}"],
+    "Wander over to {n}": ["Aizklīstiet līdz: {n}", "Прогуляйтесь до «{n}»", "Schlendern Sie zu {n}"],
+    "Explore {n}": ["Izpētiet: {n}", "Исследуйте «{n}»", "Entdecken Sie {n}"],
+    "An hour or two at {n}": ["Stunda vai divas: {n}", "Час-другой в «{n}»", "Ein, zwei Stunden in {n}"],
+    "Step into {n}": ["Ieejiet: {n}", "Загляните в «{n}»", "Treten Sie ein: {n}"],
+    "Browse {n}": ["Paraugieties: {n}", "Загляните в «{n}»", "Stöbern Sie in {n}"],
+    "Look in at {n}": ["Ieskatieties: {n}", "Зайдите в «{n}»", "Schauen Sie vorbei: {n}"],
+    "Visit {n}": ["Apmeklējiet: {n}", "Посетите «{n}»", "Besuchen Sie {n}"],
+    "Quiet moment at {n}": ["Kluss brīdis: {n}", "Тихая минута в «{n}»", "Ein stiller Moment: {n}"],
+    "Climb or look up at {n}": ["Uzkāpiet vai paskatieties augšup: {n}", "Поднимитесь или полюбуйтесь: «{n}»", "Hinaufsteigen oder hinaufschauen: {n}"],
+    "A performance at {n}": ["Izrāde: {n}", "Спектакль в «{n}»", "Eine Vorstellung: {n}"],
+    "Tickets for {n}": ["Biļetes: {n}", "Билеты в «{n}»", "Karten für {n}"],
+    "Coffee at {n}": ["Kafija: {n}", "Кофе в «{n}»", "Kaffee bei {n}"],
+    "Slow coffee at {n}": ["Nesteidzīga kafija: {n}", "Неспешный кофе в «{n}»", "Kaffee in Ruhe bei {n}"],
+    "Cake and coffee at {n}": ["Kūka un kafija: {n}", "Кофе с пирожным в «{n}»", "Kaffee und Kuchen bei {n}"],
+    "Eat at {n}": ["Paēdiet: {n}", "Поешьте в «{n}»", "Essen bei {n}"],
+    "A table at {n}": ["Galdiņš: {n}", "Столик в «{n}»", "Ein Tisch bei {n}"],
+    "Dinner at {n}": ["Vakariņas: {n}", "Ужин в «{n}»", "Abendessen bei {n}"],
+    "Drinks at {n}": ["Dzērieni: {n}", "Напитки в «{n}»", "Drinks bei {n}"],
+    "A glass at {n}": ["Glāze: {n}", "Бокал в «{n}»", "Ein Glas bei {n}"],
+    "Nightcap at {n}": ["Pēdējā glāze: {n}", "Последний бокал в «{n}»", "Absacker bei {n}"],
+    "Dance at {n}": ["Dejas: {n}", "Танцы в «{n}»", "Tanzen bei {n}"],
+    "Late night at {n}": ["Vēls vakars: {n}", "Поздний вечер в «{n}»", "Späte Stunden bei {n}"],
+    "Stroll through {n}": ["Pastaiga: {n}", "Прогулка по «{n}»", "Spaziergang durch {n}"],
+    "Fresh air in {n}": ["Svaigs gaiss: {n}", "Свежий воздух в «{n}»", "Frische Luft: {n}"],
+    "A bench in {n}": ["Soliņš: {n}", "Скамейка в «{n}»", "Eine Bank in {n}"],
+    "Shopping at {n}": ["Iepirkšanās: {n}", "Покупки в «{n}»", "Einkaufen bei {n}"],
+    "Pick up treats at {n}": ["Gardumi līdzi: {n}", "Вкусности в «{n}»", "Leckereien holen bei {n}"],
+    "Wander {n}": ["Izstaigājiet: {n}", "Побродите по «{n}»", "Bummeln Sie über {n}"],
+    "Unwind at {n}": ["Atpūta: {n}", "Расслабьтесь в «{n}»", "Entspannen bei {n}"],
+    "Treat yourself at {n}": ["Palutiniet sevi: {n}", "Побалуйте себя в «{n}»", "Gönnen Sie sich etwas: {n}"],
+    "Work out at {n}": ["Treniņš: {n}", "Тренировка в «{n}»", "Training bei {n}"],
+    "Swim or train at {n}": ["Peldēšana vai treniņš: {n}", "Плавание или тренировка в «{n}»", "Schwimmen oder trainieren: {n}"],
+    "Let the kids loose at {n}": ["Ļaujiet bērniem izskrieties: {n}", "Дайте детям порезвиться в «{n}»", "Kinder toben lassen: {n}"],
+    "Family time at {n}": ["Ģimenes laiks: {n}", "Время всей семьёй в «{n}»", "Familienzeit: {n}"],
+    "Work a few hours at {n}": ["Dažas darba stundas: {n}", "Пара рабочих часов в «{n}»", "Ein paar Stunden arbeiten: {n}"],
+    "Head to {n}": ["Dodieties uz: {n}", "Направляйтесь к «{n}»", "Weiter zu {n}"],
+    "Pop into {n}": ["Ieskrieniet: {n}", "Загляните в «{n}»", "Kurz rein: {n}"],
+
+    /* ---------------------------------------------------------------- describing a place */
+    "A café": ["Kafejnīca", "Кафе", "Ein Café"],
+    "A restaurant": ["Restorāns", "Ресторан", "Ein Restaurant"],
+    "A bar": ["Bārs", "Бар", "Eine Bar"],
+    "A late-night venue": ["Vieta vēlām stundām", "Ночное заведение", "Ein Ort für die späten Stunden"],
+    "A museum": ["Muzejs", "Музей", "Ein Museum"],
+    "A gallery": ["Galerija", "Галерея", "Eine Galerie"],
+    "A local landmark": ["Vietējā apskates vieta", "Местная достопримечательность", "Ein Wahrzeichen der Gegend"],
+    "A historic church": ["Vēsturiska baznīca", "Историческая церковь", "Eine historische Kirche"],
+    "A green space": ["Zaļā zona", "Зелёный уголок", "Eine grüne Oase"],
+    "A shop": ["Veikals", "Магазин", "Ein Geschäft"],
+    "A food shop": ["Pārtikas veikals", "Продуктовая лавка", "Ein Lebensmittelladen"],
+    "A place to unwind": ["Vieta atpūtai", "Место, чтобы расслабиться", "Ein Ort zum Entspannen"],
+    "A place to train": ["Vieta treniņiem", "Место для тренировок", "Ein Ort zum Trainieren"],
+    "Fun for children": ["Prieks bērniem", "Радость для детей", "Spaß für Kinder"],
+    "A coworking space": ["Kopstrādes telpa", "Коворкинг", "Ein Coworking-Space"],
+    "Transport link": ["Transporta mezgls", "Транспорт", "Verkehrsanbindung"],
+    "Everyday essentials": ["Ikdienas vajadzībām", "Всё необходимое", "Alles für den Alltag"],
+    "A stage for music and theatre": ["Skatuve mūzikai un teātrim", "Сцена для музыки и театра", "Eine Bühne für Musik und Theater"],
+    "Our tip: {note}": ["Mūsu padoms: {note}", "Наш совет: {note}", "Unser Tipp: {note}"],
+    "Plant-based dishes too.": ["Ir arī augu ēdieni.", "Есть и растительные блюда.", "Auch pflanzliche Gerichte."],
+
+    /* ---------------------------------------------------------------- the stay plan */
+    "the hotel": ["viesnīca", "отель", "das Hotel"],
+    "Wrap up warm: the old town glows in the snow.": ["Saģērbieties silti: vecpilsēta mirdz sniegā.", "Одевайтесь теплее: старый город сияет в снегу.", "Ziehen Sie sich warm an: Die Altstadt leuchtet im Schnee."],
+    "Evenings stay light until late, so take your time.": ["Vakari ilgi paliek gaiši, tāpēc nesteidzieties.", "Вечера светлые до поздна, так что не спешите.", "Die Abende bleiben lange hell, lassen Sie sich Zeit."],
+    "Café terraces start opening in spring.": ["Pavasarī atveras kafejnīcu terases.", "Весной открываются летние террасы кафе.", "Im Frühling öffnen die Café-Terrassen."],
+    "Golden trees and fewer crowds.": ["Zelta koki un mazāk ļaužu.", "Золотые деревья и меньше туристов.", "Goldene Bäume und weniger Trubel."],
+    "Breakfast at {hotel}": ["Brokastis: {hotel}", "Завтрак в «{hotel}»", "Frühstück im {hotel}"],
+    "Breakfast is included and served downstairs.": ["Brokastis ir iekļautas un tiek pasniegtas lejā.", "Завтрак включён и подаётся внизу.", "Das Frühstück ist inbegriffen und wird unten serviert."],
+    "A good start to the day.": ["Labs dienas sākums.", "Хорошее начало дня.", "Ein guter Start in den Tag."],
+    "Breakfast nearby": ["Brokastis tuvumā", "Завтрак рядом", "Frühstück in der Nähe"],
+    "Ask at the desk for our favourite breakfast spot.": ["Pajautājiet reģistratūrā par mūsu iecienītāko brokastu vietu.", "Спросите на ресепшене о нашем любимом месте для завтрака.", "Fragen Sie an der Rezeption nach unserem Lieblingsort fürs Frühstück."],
+    "Wander the neighbourhood": ["Izstaigājiet apkārtni", "Прогуляйтесь по округе", "Streifzug durchs Viertel"],
+    "Pick a street you have not walked yet. Everything here is close.": ["Izvēlieties ielu, pa kuru vēl neesat gājuši. Šeit viss ir tuvu.", "Выберите улицу, по которой ещё не гуляли. Здесь всё рядом.", "Nehmen Sie eine Straße, die Sie noch nicht kennen. Hier ist alles nah."],
+    "Ask us for a table nearby. We know the good ones.": ["Pajautājiet mums par galdiņu tuvumā. Mēs zinām labās vietas.", "Спросите нас о столике поблизости. Мы знаем хорошие места.", "Fragen Sie uns nach einem Tisch in der Nähe. Wir kennen die guten Adressen."],
+    "Lunch": ["Pusdienas", "Обед", "Mittagessen"],
+    "Dinner": ["Vakariņas", "Ужин", "Abendessen"],
+    "Pick up lunch at {place}": ["Pusdienas līdzi: {place}", "Обед с собой в «{place}»", "Mittagessen holen bei {place}"],
+    "Lunch at {place}": ["Pusdienas: {place}", "Обед в «{place}»", "Mittagessen bei {place}"],
+    "Dinner at {place}": ["Vakariņas: {place}", "Ужин в «{place}»", "Abendessen bei {place}"],
+    "Late night at {place}": ["Vēls vakars: {place}", "Поздний вечер в «{place}»", "Späte Stunden bei {place}"],
+    "Nightcap at {place}": ["Pēdējā glāze: {place}", "Последний бокал в «{place}»", "Absacker bei {place}"],
+    "Drinks at {place}": ["Dzērieni: {place}", "Напитки в «{place}»", "Drinks bei {place}"],
+    "Back by the fireplace": ["Atpakaļ pie kamīna", "Обратно к камину", "Zurück am Kamin"],
+    "End the day with a book by the lobby fire.": ["Noslēdziet dienu ar grāmatu pie kamīna vestibilā.", "Завершите день с книгой у камина в лобби.", "Beenden Sie den Tag mit einem Buch am Kamin in der Lobby."],
+    "Beautiful after dark, too.": ["Skaisti arī pēc tumsas iestāšanās.", "Красиво и после заката.", "Auch nach Einbruch der Dunkelheit schön."],
+    "An early night": ["Agri gulēt", "Ранний отбой", "Früh schlafen"],
+    "Sleep well: tomorrow there is more to see.": ["Guliet saldi: rīt būs vēl ko redzēt.", "Спокойной ночи: завтра будет ещё что посмотреть.", "Schlafen Sie gut: Morgen gibt es noch mehr zu sehen."],
+    "Check in at {hotel}": ["Reģistrācija: {hotel}", "Заселение в «{hotel}»", "Check-in im {hotel}"],
+    "Drop your bags, freshen up and pick up a map at the desk.": ["Atstājiet somas, atsvaidzinieties un paņemiet karti reģistratūrā.", "Оставьте сумки, освежитесь и возьмите карту на ресепшене.", "Taschen abstellen, frisch machen und an der Rezeption eine Karte mitnehmen."],
+    "First walk: {what}": ["Pirmā pastaiga: {what}", "Первая прогулка: {what}", "Erster Spaziergang: {what}"],
+    "To start the trip.": ["Brauciena sākumam.", "Для начала поездки.", "Zum Auftakt der Reise."],
+    "An aperitif at {place}": ["Aperitīvs: {place}", "Аперитив в «{place}»", "Ein Aperitif bei {place}"],
+    "Dinner downstairs at {place}": ["Vakariņas lejā: {place}", "Ужин внизу, в «{place}»", "Abendessen unten im {place}"],
+    "No need to go far on your first night.": ["Pirmajā vakarā nav jāiet tālu.", "В первый вечер не нужно далеко идти.", "Am ersten Abend müssen Sie nicht weit gehen."],
+    "Arrival": ["Ierašanās", "Приезд", "Anreise"],
+    "Before breakfast, while the streets are quiet.": ["Pirms brokastīm, kamēr ielas ir klusas.", "До завтрака, пока улицы тихие.", "Vor dem Frühstück, solange die Straßen ruhig sind."],
+    "Fast Wi-Fi and good coffee.": ["Ātrs Wi-Fi un laba kafija.", "Быстрый Wi-Fi и хороший кофе.", "Schnelles WLAN und guter Kaffee."],
+    "Warm up for a while.": ["Mazliet sasildieties.", "Немного согрейтесь.", "Wärmen Sie sich ein wenig auf."],
+    "Check what is on tonight: most performances start around 19:00.": ["Paskatieties, kas šovakar notiek: lielākā daļa izrāžu sākas ap 19:00.", "Посмотрите, что идёт сегодня: большинство спектаклей начинается около 19:00.", "Schauen Sie, was heute läuft: Die meisten Vorstellungen beginnen gegen 19:00."],
+    "An evening performance at {place}": ["Vakara izrāde: {place}", "Вечерний спектакль в «{place}»", "Eine Abendvorstellung: {place}"],
+    "A late supper after the show.": ["Vēlas vakariņas pēc izrādes.", "Поздний ужин после спектакля.", "Ein spätes Essen nach der Vorstellung."],
+    "Late supper at {place}": ["Vēlas vakariņas: {place}", "Поздний ужин в «{place}»", "Spätes Essen bei {place}"],
+    "Departure": ["Aizbraukšana", "Отъезд", "Abreise"],
+    "One last look before you go.": ["Pēdējais skats pirms aizbraukšanas.", "Последний взгляд перед отъездом.", "Ein letzter Blick vor der Abreise."],
+    "Check out": ["Izrakstīšanās", "Выезд", "Check-out"],
+    "Leave your bags with us and enjoy the rest of the day.": ["Atstājiet somas pie mums un baudiet atlikušo dienu.", "Оставьте сумки у нас и наслаждайтесь остатком дня.", "Lassen Sie Ihr Gepäck bei uns und genießen Sie den Rest des Tages."],
+    "Thank you for staying with us.": ["Paldies, ka bijāt pie mums.", "Спасибо, что остановились у нас.", "Danke, dass Sie bei uns waren."],
+    "To the airport": ["Uz lidostu", "В аэропорт", "Zum Flughafen"],
+    "{hotel} is {walk} from {place}": ["No {hotel} līdz {place} ir {walk}", "От «{hotel}» до «{place}» — {walk}", "Vom {hotel} sind es {walk} bis {place}"],
+    ", with {list} within ten minutes on foot.": [", un desmit minūšu gājienā: {list}.", ", а в десяти минутах пешком: {list}.", ", und in zehn Minuten zu Fuß: {list}."],
+    "{n} {things}": ["{things}: {n}", "{things} — {n}", "{n} {things}"],
+    " and ": [" un ", " и ", " und "],
+
+    /* ---------------------------------------------------------------- drafted texts (shown while the owner's are empty) */
+    "Welcome to {hotel}": ["Laipni lūdzam {hotel}", "Добро пожаловать в «{hotel}»", "Willkommen im {hotel}"],
+    ", in the heart of {area}": [", pašā {area} sirdī", ", в самом сердце района {area}", ", mitten in {area}"],
+    "our hotel": ["mūsu viesnīcā", "наш отель", "unserem Hotel"],
+    "From our door it is {list}. ": ["No mūsu durvīm: {list}. ", "От наших дверей: {list}. ", "Von unserer Tür sind es {list}. "],
+    "{walk} to {place}": ["{walk} līdz {place}", "{walk} до «{place}»", "{walk} bis {place}"],
+    "We are a small, personal hotel: we know our guests by name, and we love sharing the places we go ourselves.": [
+      "Mēs esam neliela, personiska viesnīca: mēs zinām savus viesus pēc vārda un labprāt dalāmies ar vietām, kur ejam paši.",
+      "Мы небольшой, уютный отель: знаем гостей по имени и с радостью делимся местами, куда ходим сами.",
+      "Wir sind ein kleines, persönliches Hotel: Wir kennen unsere Gäste beim Namen und teilen gern die Orte, an die wir selbst gehen."],
+    "the city": ["pilsēta", "город", "die Stadt"],
+    "Step outside and {area} is yours: {n} places within a fifteen-minute walk, including {cafes} cafés and {rest} restaurants within ten minutes": [
+      "Izejiet ārā, un {area} ir jūsu: {n} vietas piecpadsmit minūšu gājienā, tostarp desmit minūšu attālumā kafejnīcas ({cafes}) un restorāni ({rest})",
+      "Выйдите за дверь, и {area} ваш: мест в пятнадцати минутах пешком — {n}, из них в десяти минутах кафе ({cafes}) и рестораны ({rest})",
+      "Treten Sie hinaus, und {area} gehört Ihnen: {n} Orte in fünfzehn Gehminuten, darunter {cafes} Cafés und {rest} Restaurants in zehn Minuten"],
+    ", and {mus} museums": [", kā arī muzeji ({mus})", ", а также музеи ({mus})", " sowie {mus} Museen"],
+    ". Leave the car; you will not need it.": [". Atstājiet auto; tas jums nebūs vajadzīgs.", ". Оставьте машину: она вам не понадобится.", ". Lassen Sie das Auto stehen; Sie brauchen es nicht."],
+    "{n} minutes {label}": ["{n} minūtes {label}", "{n} мин {label}", "{n} Minuten {label}"],
+    "Right in the middle of everything, on a quiet street.": ["Pašā centrā, klusā ielā.", "В самом центре, на тихой улице.", "Mitten im Geschehen, in einer ruhigen Straße."],
+    "What time is check-in and check-out?": ["Cikos ir reģistrācija un izrakstīšanās?", "Во сколько заезд и выезд?", "Wann sind Check-in und Check-out?"],
+    "Check-in is from {in} and check-out is until {out}.": ["Reģistrācija no {in}, izrakstīšanās līdz {out}.", "Заезд с {in}, выезд до {out}.", "Check-in ab {in}, Check-out bis {out}."],
+    "Is breakfast included?": ["Vai brokastis ir iekļautas?", "Завтрак включён?", "Ist das Frühstück inbegriffen?"],
+    "Yes, breakfast is included.": ["Jā, brokastis ir iekļautas.", "Да, завтрак включён.", "Ja, das Frühstück ist inbegriffen."],
+    "When do I pay?": ["Kad man jāmaksā?", "Когда нужно платить?", "Wann bezahle ich?"],
+    "Is there parking?": ["Vai ir stāvvieta?", "Есть ли парковка?", "Gibt es Parkplätze?"],
+    "How do I get here from the airport?": ["Kā nokļūt šeit no lidostas?", "Как добраться из аэропорта?", "Wie komme ich vom Flughafen hierher?"],
+
+    /* ---------------------------------------------------------------- amenities, channels, payments, kinds */
+    "Breakfast included": ["Brokastis iekļautas", "Завтрак включён", "Frühstück inbegriffen"],
+    "Restaurant in the house": ["Restorāns viesnīcā", "Ресторан в отеле", "Restaurant im Haus"],
+    "Free Wi-Fi": ["Bezmaksas Wi-Fi", "Бесплатный Wi-Fi", "Kostenloses WLAN"],
+    "Lobby fireplace": ["Kamīns vestibilā", "Камин в лобби", "Kamin in der Lobby"],
+    "Guest library": ["Viesu bibliotēka", "Библиотека для гостей", "Gästebibliothek"],
+    "Bikes to rent": ["Velosipēdu noma", "Прокат велосипедов", "Fahrradverleih"],
+    "Lift": ["Lifts", "Лифт", "Aufzug"],
+    "Luggage storage": ["Bagāžas glabāšana", "Камера хранения", "Gepäckaufbewahrung"],
+    "Airport transfer": ["Transfērs no lidostas", "Трансфер из аэропорта", "Flughafentransfer"],
+    "Parking nearby": ["Stāvvieta tuvumā", "Парковка рядом", "Parken in der Nähe"],
+    "Cots for little ones": ["Gultiņas mazuļiem", "Детские кроватки", "Babybetten"],
+    "Pets welcome": ["Mājdzīvnieki laipni gaidīti", "Можно с животными", "Haustiere willkommen"],
+    "Step-free access": ["Piekļuve bez pakāpieniem", "Доступ без ступенек", "Stufenloser Zugang"],
+    "Late check-in": ["Vēla reģistrācija", "Поздний заезд", "Später Check-in"],
+    "Work desk": ["Darba galds", "Рабочий стол", "Schreibtisch"],
+    "Tea & coffee in rooms": ["Tēja un kafija numuros", "Чай и кофе в номерах", "Tee & Kaffee im Zimmer"],
+    "Quiet rooms": ["Klusi numuri", "Тихие номера", "Ruhige Zimmer"],
+    "Air conditioning": ["Gaisa kondicionieris", "Кондиционер", "Klimaanlage"],
+    "Sauna or spa": ["Pirts vai spa", "Сауна или спа", "Sauna oder Spa"],
+    "Gym": ["Sporta zāle", "Спортзал", "Fitnessraum"],
+    "24-hour reception": ["Diennakts reģistratūra", "Круглосуточный ресепшен", "Rezeption rund um die Uhr"],
+    "Tours & tickets desk": ["Ekskursijas un biļetes", "Экскурсии и билеты", "Touren & Tickets"],
+    "Book direct": ["Rezervēt tieši", "Забронировать напрямую", "Direkt buchen"],
+    "Call us": ["Zvaniet mums", "Позвоните нам", "Rufen Sie uns an"],
+    "Email us": ["Rakstiet mums", "Напишите нам", "Schreiben Sie uns"],
+    "Book online": ["Rezervēt tiešsaistē", "Забронировать онлайн", "Online buchen"],
+    "Cash": ["Skaidra nauda", "Наличные", "Bargeld"],
+    "Bank transfer": ["Bankas pārskaitījums", "Банковский перевод", "Banküberweisung"],
+    "Boutique hotel": ["Butika viesnīca", "Бутик-отель", "Boutique-Hotel"],
+    "Guesthouse": ["Viesu nams", "Гостевой дом", "Gästehaus"],
+    "Bed & breakfast": ["Viesu māja ar brokastīm", "Мини-отель с завтраком", "Bed & Breakfast"],
+    "Aparthotel": ["Apartviesnīca", "Апарт-отель", "Aparthotel"],
+    "Hostel": ["Hostelis", "Хостел", "Hostel"],
+    "Inn": ["Krogs ar naktsmājām", "Гостиница", "Gasthof"],
+    "Villa": ["Villa", "Вилла", "Villa"],
+
+    /* ---------------------------------------------------------------- the 30 guest profiles: name, line, hook */
+    "Art Nouveau Admirer": ["Jūgendstila cienītājs", "Ценитель модерна", "Jugendstil-Liebhaber"],
+    "Here for facades, stained glass and the curve of a staircase.": ["Brauc fasāžu, vitrāžu un kāpņu līkumu dēļ.", "Едет ради фасадов, витражей и изгибов лестниц.", "Kommt für Fassaden, Buntglas und den Schwung einer Treppe."],
+    "Wake up among the finest facades in Europe.": ["Mostieties starp Eiropas skaistākajām fasādēm.", "Просыпайтесь среди лучших фасадов Европы.", "Wachen Sie zwischen den schönsten Fassaden Europas auf."],
+    "History Buff": ["Vēstures mīļotājs", "Любитель истории", "Geschichtsfan"],
+    "Every cobblestone has a story, and they want all of them.": ["Katram bruģakmenim ir stāsts, un viņš grib dzirdēt visus.", "У каждого камня мостовой своя история, и он хочет услышать все.", "Jeder Pflasterstein hat eine Geschichte, und er will alle hören."],
+    "Centuries of history start at the front door.": ["Gadsimtiem sena vēsture sākas aiz durvīm.", "Века истории начинаются прямо за дверью.", "Jahrhunderte Geschichte beginnen vor der Haustür."],
+    "Foodie": ["Gardēdis", "Гурман", "Feinschmecker"],
+    "Plans the trip around lunch and dinner. Breakfast too.": ["Plāno braucienu ap pusdienām un vakariņām. Un brokastīm.", "Планирует поездку вокруг обедов и ужинов. И завтраков.", "Plant die Reise rund um Mittag- und Abendessen. Und Frühstück."],
+    "Your table is never more than a few minutes away.": ["Jūsu galdiņš vienmēr ir tikai dažu minūšu attālumā.", "Ваш столик всегда в паре минут.", "Ihr Tisch ist nie mehr als ein paar Minuten entfernt."],
+    "Coffee Lover": ["Kafijas cienītājs", "Любитель кофе", "Kaffeeliebhaber"],
+    "Judges a city by its flat whites and its cinnamon buns.": ["Vērtē pilsētu pēc tās kafijas un kanēļmaizītēm.", "Судит о городе по его флэт уайту и булочкам с корицей.", "Beurteilt eine Stadt nach ihrem Flat White und ihren Zimtschnecken."],
+    "A great cup of coffee around every corner.": ["Lieliska kafija aiz katra stūra.", "Отличный кофе за каждым углом.", "Großartiger Kaffee an jeder Ecke."],
+    "Romantic Couple": ["Romantisks pāris", "Романтичная пара", "Romantisches Paar"],
+    "Candle-lit dinners, late mornings, a walk by the water.": ["Vakariņas sveču gaismā, vēli rīti, pastaiga gar ūdeni.", "Ужины при свечах, поздние утра, прогулка у воды.", "Dinner bei Kerzenlicht, späte Morgen, ein Spaziergang am Wasser."],
+    "Candle-lit dinners and cobbled lanes for two.": ["Vakariņas sveču gaismā un bruģētas ieliņas diviem.", "Ужины при свечах и мощёные улочки для двоих.", "Dinner bei Kerzenlicht und Gassen für zwei."],
+    "Family with Kids": ["Ģimene ar bērniem", "Семья с детьми", "Familie mit Kindern"],
+    "Little legs, big curiosity, and snacks at all times.": ["Mazas kājiņas, liela ziņkārība un uzkodas vienmēr.", "Маленькие ножки, большое любопытство и перекусы всегда под рукой.", "Kleine Beine, große Neugier und immer Snacks dabei."],
+    "Short walks, big adventures, room for everyone.": ["Īsas pastaigas, lieli piedzīvojumi, vieta visiem.", "Короткие прогулки, большие приключения, место для всех.", "Kurze Wege, große Abenteuer, Platz für alle."],
+    "Business Traveller": ["Darba ceļotājs", "Деловой путешественник", "Geschäftsreisender"],
+    "Meetings by day, a good dinner and a quiet room by night.": ["Dienā tikšanās, vakarā labas vakariņas un kluss numurs.", "Днём встречи, вечером хороший ужин и тихий номер.", "Tagsüber Termine, abends ein gutes Essen und ein ruhiges Zimmer."],
+    "Close to everything, quiet when you need it.": ["Tuvu visam, klusi, kad tas vajadzīgs.", "Рядом со всем, тихо, когда нужно.", "Nah an allem, ruhig, wenn Sie es brauchen."],
+    "Digital Nomad": ["Digitālais nomads", "Цифровой кочевник", "Digitaler Nomade"],
+    "Laptop, good Wi-Fi, better coffee, a city to explore after five.": ["Klēpjdators, labs Wi-Fi, vēl labāka kafija un pilsēta, ko izpētīt pēc pieciem.", "Ноутбук, хороший Wi-Fi, кофе ещё лучше и город, который можно исследовать после пяти.", "Laptop, gutes WLAN, noch besserer Kaffee und eine Stadt zum Entdecken nach fünf."],
+    "Work from anywhere, then explore everything.": ["Strādājiet no jebkurienes, pēc tam izpētiet visu.", "Работайте откуда угодно, а потом исследуйте всё.", "Arbeiten Sie von überall, dann entdecken Sie alles."],
+    "Night Owl": ["Naktspūce", "Сова", "Nachteule"],
+    "The city really starts after 10 pm.": ["Pilsēta īsti sākas pēc desmitiem vakarā.", "Город по-настоящему оживает после десяти вечера.", "Die Stadt beginnt erst nach 22 Uhr richtig."],
+    "The bars are close, and so is your bed.": ["Bāri ir tuvu, un tāpat arī jūsu gulta.", "Бары рядом, и ваша кровать тоже.", "Die Bars sind nah, und Ihr Bett auch."],
+    "Concert & Opera Goer": ["Koncertu un operas apmeklētājs", "Любитель концертов и оперы", "Konzert- und Operngänger"],
+    "Has the opera schedule open in another tab.": ["Operas repertuārs jau atvērts citā cilnē.", "Афиша оперы уже открыта в соседней вкладке.", "Hat den Opernspielplan im anderen Tab offen."],
+    "Curtain up, then a short walk home.": ["Priekškars veras, pēc tam īsa pastaiga mājup.", "Занавес, а потом короткая прогулка домой.", "Vorhang auf, danach ein kurzer Weg nach Hause."],
+    "Shopper": ["Iepirkšanās mīļotājs", "Любитель шопинга", "Shopping-Fan"],
+    "Leaves with one more bag than they arrived with.": ["Aizbrauc ar vienu somu vairāk nekā atbrauca.", "Уезжает с одной сумкой больше, чем приехал.", "Reist mit einer Tasche mehr ab, als er gekommen ist."],
+    "Boutiques, markets and makers on your doorstep.": ["Butiki, tirgi un amatnieki pie jūsu durvīm.", "Бутики, рынки и мастера прямо у порога.", "Boutiquen, Märkte und Manufakturen vor der Tür."],
+    "Wellness Seeker": ["Labsajūtas meklētājs", "Ищущий гармонии", "Wellness-Suchender"],
+    "Saunas, slow mornings, green spaces and early nights.": ["Pirtis, nesteidzīgi rīti, zaļas vietas un agri vakari.", "Сауны, неспешные утра, зелень и ранний отбой.", "Saunen, ruhige Morgen, viel Grün und frühe Nächte."],
+    "Slow mornings, green parks, a city that breathes.": ["Nesteidzīgi rīti, zaļi parki, pilsēta, kas elpo.", "Неспешные утра, зелёные парки, город, который дышит.", "Ruhige Morgen, grüne Parks, eine Stadt, die atmet."],
+    "Morning Runner": ["Rīta skrējējs", "Утренний бегун", "Morgenläufer"],
+    "Laces up before breakfast and maps every route.": ["Pirms brokastīm sasien kurpes un izplāno katru maršrutu.", "Зашнуровывается до завтрака и прокладывает каждый маршрут.", "Schnürt vor dem Frühstück die Schuhe und plant jede Strecke."],
+    "Run the canal at sunrise, breakfast when you are back.": ["Skrējiens gar kanālu saullēktā, brokastis pēc atgriešanās.", "Пробежка вдоль канала на рассвете, завтрак по возвращении.", "Bei Sonnenaufgang am Kanal laufen, danach frühstücken."],
+    "Cyclist": ["Riteņbraucējs", "Велосипедист", "Radfahrer"],
+    "Sees the city on two wheels, from the river to the suburbs.": ["Redz pilsētu no diviem riteņiem, no upes līdz priekšpilsētām.", "Смотрит город с велосипеда, от реки до окраин.", "Erkundet die Stadt auf zwei Rädern, vom Fluss bis in die Vororte."],
+    "Grab a bike and the whole city is yours.": ["Paņemiet velosipēdu, un visa pilsēta ir jūsu.", "Берите велосипед, и весь город ваш.", "Schnappen Sie sich ein Rad, und die ganze Stadt gehört Ihnen."],
+    "Photographer": ["Fotogrāfs", "Фотограф", "Fotograf"],
+    "Chases golden hour, rooftops and quiet streets at dawn.": ["Medī zelta stundu, jumtus un klusas ielas rītausmā.", "Охотится за золотым часом, крышами и тихими улицами на рассвете.", "Jagt die goldene Stunde, Dächer und stille Straßen im Morgengrauen."],
+    "Golden hour starts outside your window.": ["Zelta stunda sākas aiz jūsu loga.", "Золотой час начинается за вашим окном.", "Die goldene Stunde beginnt vor Ihrem Fenster."],
+    "Budget Explorer": ["Taupīgs ceļotājs", "Экономный путешественник", "Sparfuchs"],
+    "Wants the most city for the least money.": ["Grib redzēt visvairāk par vismazāko naudu.", "Хочет увидеть больше всего за меньшие деньги.", "Will am meisten Stadt fürs wenigste Geld."],
+    "Walk everywhere. Spend it on experiences.": ["Ejiet visur kājām. Tērējiet piedzīvojumiem.", "Ходите везде пешком. Тратьте на впечатления.", "Gehen Sie überall zu Fuß. Geben Sie es für Erlebnisse aus."],
+    "Solo Traveller": ["Ceļotājs vienatnē", "Путешественник-одиночка", "Alleinreisender"],
+    "Their own pace, their own plans, and a good book.": ["Savs temps, savi plāni un laba grāmata.", "Свой темп, свои планы и хорошая книга.", "Eigenes Tempo, eigene Pläne und ein gutes Buch."],
+    "Your own pace, in a city that is easy to love.": ["Savā tempā, pilsētā, kuru ir viegli iemīlēt.", "В своём темпе, в городе, который легко полюбить.", "In Ihrem Tempo, in einer Stadt, die man leicht lieben kann."],
+    "Friends' Weekend": ["Draugu nedēļas nogale", "Выходные с друзьями", "Wochenende mit Freunden"],
+    "Three friends, two days, one group chat full of plans.": ["Trīs draugi, divas dienas un viena čata grupa, pilna plānu.", "Трое друзей, два дня и один групповой чат, полный планов.", "Drei Freunde, zwei Tage, ein Gruppenchat voller Pläne."],
+    "Dinner, drinks and stories you will retell for years.": ["Vakariņas, dzērieni un stāsti, ko stāstīsiet gadiem.", "Ужин, напитки и истории, которые вы будете пересказывать годами.", "Abendessen, Drinks und Geschichten, die Sie noch jahrelang erzählen."],
+    "Unhurried Travellers": ["Nesteidzīgi ceļotāji", "Неторопливые путешественники", "Gemütlich Reisende"],
+    "Retired, curious and in no rush at all.": ["Pensijā, ziņkārīgi un nekur nesteidzas.", "На пенсии, любознательны и никуда не спешат.", "Im Ruhestand, neugierig und ganz ohne Eile."],
+    "Everything worth seeing, within an easy stroll.": ["Viss, ko vērts redzēt, vieglas pastaigas attālumā.", "Всё, что стоит увидеть, в лёгкой прогулке.", "Alles Sehenswerte, gemütlich zu Fuß erreichbar."],
+    "Step-free Traveller": ["Ceļotājs bez pakāpieniem", "Путешественник без ступенек", "Stufenlos Reisende"],
+    "Needs smooth routes, lifts and no surprises.": ["Vajag līdzenus maršrutus, liftus un bez pārsteigumiem.", "Нужны ровные маршруты, лифты и никаких сюрпризов.", "Braucht ebene Wege, Aufzüge und keine Überraschungen."],
+    "Short, smooth routes and help when you need it.": ["Īsi, līdzeni maršruti un palīdzība, kad tā vajadzīga.", "Короткие ровные маршруты и помощь, когда нужна.", "Kurze, ebene Wege und Hilfe, wenn Sie sie brauchen."],
+    "Travelling with a Dog": ["Ceļojums ar suni", "Путешествие с собакой", "Reisen mit Hund"],
+    "The best friend comes too.": ["Labākais draugs brauc līdzi.", "Лучший друг едет с вами.", "Der beste Freund kommt mit."],
+    "Parks for them, cafés for you.": ["Parki viņam, kafejnīcas jums.", "Парки для него, кафе для вас.", "Parks für ihn, Cafés für Sie."],
+    "Winter & Christmas Market": ["Ziema un Ziemassvētku tirdziņš", "Зима и рождественская ярмарка", "Winter & Weihnachtsmarkt"],
+    "Mulled wine, candlelight and markets under falling snow.": ["Karstvīns, sveču gaisma un tirdziņi krītošā sniegā.", "Глинтвейн, свечи и ярмарки под падающим снегом.", "Glühwein, Kerzenlicht und Märkte im fallenden Schnee."],
+    "Christmas markets and candlelit cafés, a short walk away.": ["Ziemassvētku tirdziņi un kafejnīcas sveču gaismā, pāris soļu attālumā.", "Рождественские ярмарки и кафе при свечах в паре шагов.", "Weihnachtsmärkte und Cafés bei Kerzenlicht, nur ein paar Schritte entfernt."],
+    "White Nights Summer": ["Baltās naktis vasarā", "Лето белых ночей", "Sommer der hellen Nächte"],
+    "Long evenings, terraces and sunsets after ten.": ["Gari vakari, terases un saulrieti pēc desmitiem.", "Долгие вечера, террасы и закаты после десяти.", "Lange Abende, Terrassen und Sonnenuntergänge nach zehn."],
+    "Long light evenings on the terraces outside.": ["Gari, gaiši vakari uz terasēm turpat blakus.", "Долгие светлые вечера на террасах рядом.", "Lange helle Abende auf den Terrassen ringsum."],
+    "Craft Beer Fan": ["Amatniecības alus cienītājs", "Любитель крафтового пива", "Craft-Beer-Fan"],
+    "Has a list of breweries and taprooms to tick off.": ["Viņam ir saraksts ar alus darītavām un krogiem, ko apmeklēt.", "У него список пивоварен и тапрумов, которые надо обойти.", "Hat eine Liste von Brauereien und Taprooms zum Abhaken."],
+    "Taprooms and beer gardens within a short wander.": ["Alus krodziņi un dārzi īsas pastaigas attālumā.", "Пивные бары и сады в короткой прогулке.", "Taprooms und Biergärten nur einen kurzen Bummel entfernt."],
+    "Plant-based Eater": ["Augu ēdienu cienītājs", "Растительное питание", "Pflanzlich Essende"],
+    "Vegetarian or vegan, and always hunting the best menus.": ["Veģetārietis vai vegāns, vienmēr meklē labākās ēdienkartes.", "Вегетарианец или веган, всегда ищет лучшие меню.", "Vegetarisch oder vegan und immer auf der Suche nach den besten Speisekarten."],
+    "Fresh, green food all around the block.": ["Svaigs, zaļš ēdiens visapkārt.", "Свежая растительная еда по всему кварталу.", "Frisches, grünes Essen rund um den Block."],
+    "Short Layover": ["Īsa pārsēšanās", "Короткая пересадка", "Kurzer Zwischenstopp"],
+    "One night, a few hours of city, an early flight.": ["Viena nakts, dažas stundas pilsētā un agrs lidojums.", "Одна ночь, пара часов в городе и ранний рейс.", "Eine Nacht, ein paar Stunden Stadt, ein früher Flug."],
+    "One night is enough to fall for the city.": ["Ar vienu nakti pietiek, lai iemīlētu pilsētu.", "Одной ночи хватит, чтобы влюбиться в город.", "Eine Nacht reicht, um sich in die Stadt zu verlieben."],
+    "Ferry & Cruise Day": ["Prāmja un kruīza diena", "День с парома или круиза", "Fähr- & Kreuzfahrttag"],
+    "Arrives by sea and wants the highlights before sailing.": ["Ierodas pa jūru un grib redzēt labāko pirms atiešanas.", "Прибывает морем и хочет увидеть главное до отплытия.", "Kommt übers Meer und will die Highlights vor dem Ablegen sehen."],
+    "The best of the old town, then back to the port.": ["Labākais no vecpilsētas, tad atpakaļ uz ostu.", "Лучшее в старом городе, а потом обратно в порт.", "Das Beste der Altstadt, dann zurück zum Hafen."],
+    "Architecture Student": ["Arhitektūras students", "Студент-архитектор", "Architekturstudent"],
+    "Sketchbook in hand, from Gothic to Jugendstil to Soviet modern.": ["Ar skiču bloknotu rokā: no gotikas līdz jūgendstilam un padomju modernismam.", "С альбомом в руках: от готики до модерна и советского модернизма.", "Skizzenbuch in der Hand, von Gotik über Jugendstil bis zur sowjetischen Moderne."],
+    "Seven centuries of architecture in one walk.": ["Septiņi arhitektūras gadsimti vienā pastaigā.", "Семь веков архитектуры за одну прогулку.", "Sieben Jahrhunderte Architektur auf einem Spaziergang."],
+    "Event & Conference Visitor": ["Pasākuma vai konferences viesis", "Гость мероприятия или конференции", "Event- & Konferenzgast"],
+    "In town for an event, with evenings free.": ["Pilsētā pasākuma dēļ, vakari brīvi.", "В городе ради мероприятия, вечера свободны.", "Wegen eines Events in der Stadt, die Abende sind frei."],
+    "Walk to the venue, unwind in the old town.": ["Kājām līdz norises vietai, atpūta vecpilsētā.", "Пешком до площадки, отдых в старом городе.", "Zu Fuß zum Veranstaltungsort, entspannen in der Altstadt."],
+    "Long Stay": ["Ilga uzturēšanās", "Долгое пребывание", "Langer Aufenthalt"],
+    "Here for weeks: groceries, a gym and a favourite café matter.": ["Šeit uz nedēļām: svarīgs ir veikals, sporta zāle un iemīļota kafejnīca.", "Здесь на недели: важны продукты, спортзал и любимое кафе.", "Für Wochen hier: Supermarkt, Fitnessstudio und ein Lieblingscafé zählen."],
+    "Live like a local, from market to morning run.": ["Dzīvojiet kā vietējais: no tirgus līdz rīta skrējienam.", "Живите как местный: от рынка до утренней пробежки.", "Leben Sie wie ein Einheimischer, vom Markt bis zum Morgenlauf."]
+  };
+
+  NS.t = function (s, vars) {
+    var row = NS.lang !== 'en' ? DICT[s] : null;
+    var out = (row && row[IDX[NS.lang]]) || String(s == null ? '' : s);
+    if (vars) out = out.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; });
+    return out;
+  };
+  NS.th = function (s, vars) {
+    var out = NS.esc(NS.t(s));
+    if (vars) out = out.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; });
+    return out;
+  };
+  NS.tr = function (s) {
+    if (s == null || s === '' || NS.lang === 'en') return s;
+    var k = String(s);
+    if (owner[k]) return owner[k];
+    var row = DICT[k];
+    return (row && row[IDX[NS.lang]]) || s;
+  };
+  NS.hasWord = function (s) { return !!DICT[s]; };
+  NS.tIn = function (lang, s) { var row = DICT[s]; return (row && IDX[lang] != null && row[IDX[lang]]) || ''; };
+  NS.siteLangs = function (data) {
+    var on = (data && data.langs) || [];
+    return NS.LANG_ORDER.filter(function (c) { return c === 'en' || on.indexOf(c) >= 0; });
+  };
+  NS.setLang = function (code, data) {
+    NS.lang = NS.LANGS[code] ? code : 'en';
+    owner = (data && data.i18n && data.i18n[NS.lang]) || {};
+    return NS.lang;
+  };
+  /* Lower-case the first letter where the language allows it (German nouns keep their capital). */
+  NS.lcFirst = function (s) {
+    s = String(s || '');
+    return NS.lang === 'de' ? s : s.charAt(0).toLowerCase() + s.slice(1);
+  };
+  /* The language a guest's browser prefers, if the site offers it. */
+  NS.browserLang = function (offered) {
+    var prefs = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en']);
+    for (var i = 0; i < prefs.length; i++) {
+      var c = String(prefs[i] || '').slice(0, 2).toLowerCase();
+      if (offered.indexOf(c) >= 0) return c;
+    }
+    return null;
+  };
+})();

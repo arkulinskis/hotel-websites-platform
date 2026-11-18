@@ -1,5 +1,6 @@
 """Page addresses: #name/arg1/arg2 -> a page Form (open_form), with sign-in rules. Same addresses as the JavaScript
-version, so links people saved keep working (#sites, #new, #edit/<id>/<tab>, #explore, #admin/<tab>, #auth/signup).
+version, so links people saved keep working (#sites, #new, #edit/<id>/<tab>, #explore, #admin/<tab>, #auth/signup);
+#questions[/<filter>] is the guest-question inbox (2026-11).
 
 Links in templates are plain <a href="#sites">; code calls router.go("edit", site_id).
 
@@ -20,11 +21,12 @@ PAGES = {
     "sites": ("user", "Your sites"),
     "new": ("user", "New site"),
     "edit": ("user", "Edit site"),
+    "questions": ("user", "Questions from guests"),
     "explore": (None, "Explore hotels"),
     "profile": ("user", "Your profile"),
     "admin": ("admin", "Admin"),
 }
-NAV = [("sites", "Sites", "home"), ("explore", "Explore", "globe")]
+NAV = [("sites", "Sites", "home"), ("questions", "Questions", "chat"), ("explore", "Explore", "globe")]
 HOME = "sites"
 APP_NAME = "ArviStay"
 _r: dict = {"after": "", "listening": False, "page": None}
@@ -50,6 +52,9 @@ def _form(name):
     if name == "explore":
         from .Pages.Explore import Explore
         return Explore
+    if name == "questions":
+        from .Pages.Questions import Questions
+        return Questions
     if name == "profile":
         from .Pages.Profile import Profile
         return Profile

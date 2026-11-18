@@ -140,10 +140,21 @@
                c: { bg: '#fbfaf7', surface: '#ffffff', ink: '#2b2d2a', muted: '#6b6f69', line: '#e6e2d9', brand: '#6b5b95', brandInk: '#ffffff', accent: '#7a8c4e', soft: '#eeeaf5', deep: '#2b2440' } }
   };
 
-  /* ------------------------------------------------------------------ typography pairs (Google Fonts) */
+  /* ------------------------------------------------------------------ typography pairs (Google Fonts)
+     Jost (Google Fonts) draws the Latvian macrons (ā ē ī ū) on the wrong letter, like Fraunces (APP_MAKER/ANVIL_NOTES.md).
+     So Belle Époque loads Jost only for basic Latin, Western European and Cyrillic letters (css2: the text= parameter) and
+     every other letter (Latvian, Lithuanian, Polish…) falls back to Figtree, a near-identical geometric sans. */
+  var JOST_TEXT = (function () {
+    var s = '', c;
+    for (c = 32; c < 127; c++) s += String.fromCharCode(c);
+    for (c = 160; c < 256; c++) s += String.fromCharCode(c);
+    for (c = 0x400; c < 0x460; c++) s += String.fromCharCode(c);
+    return s + '\u2013\u2014\u2018\u2019\u201c\u201d\u201e\u00ab\u00bb\u2026\u20ac\u2022\u00b7\u2116';
+  })();
   NS.FONTS = {
-    belle:     { name: 'Belle Époque', display: 'Cormorant Garamond', body: 'Jost',
-                 css: 'family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Jost:wght@400;500;600' },
+    belle:     { name: 'Belle Époque', display: 'Cormorant Garamond', body: 'Jost', fallback: 'Figtree',
+                 css: 'family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Figtree:wght@400;500;600',
+                 css2: 'family=Jost:wght@400;500;600&text=' + encodeURIComponent(JOST_TEXT) },
     secession: { name: 'Secession', display: 'Federo', body: 'Lora',
                  css: 'family=Federo&family=Lora:ital,wght@0,400;0,500;0,600;1,400' },
     atelier:   { name: 'Atelier', display: 'Playfair Display', body: 'Karla',
@@ -154,6 +165,15 @@
   NS.fontsUrl = function (key) {
     var f = NS.FONTS[key] || NS.FONTS.belle;
     return 'https://fonts.googleapis.com/css2?' + f.css + '&display=swap';
+  };
+  /* Every stylesheet a pair needs (Belle Époque: two, see above). */
+  NS.fontsUrls = function (key) {
+    var f = NS.FONTS[key] || NS.FONTS.belle;
+    return [NS.fontsUrl(key)].concat(f.css2 ? ['https://fonts.googleapis.com/css2?' + f.css2 + '&display=swap'] : []);
+  };
+  NS.bodyStack = function (key) {
+    var f = NS.FONTS[key] || NS.FONTS.belle;
+    return '"' + f.body + '", ' + (f.fallback ? '"' + f.fallback + '", ' : '') + 'system-ui, sans-serif';
   };
 
   /* ------------------------------------------------------------------ hotel amenities (highlights + persona perks) */
@@ -291,6 +311,573 @@
     googlepay: 'Google Pay', cash: 'Cash', transfer: 'Bank transfer', paypal: 'PayPal' };
 })();
 
+/* Part 1b: languages. A hotel site is written in English and can also be shown in Latvian, Russian and German.
+
+     NS.LANGS            the languages a site can offer (code -> {name, short, locale})
+     NS.lang             the language the page is drawn in now ('en' unless the guest or the page picked another)
+     NS.t(s, vars)       the site's own words (buttons, headings, the automatic stay plan): s is the English text,
+                         looked up in DICT below; {name} placeholders are filled from vars (plain text)
+     NS.th(s, vars)      the same, HTML-escaped, with vars that are already HTML (for <b>…</b> inside a sentence)
+     NS.tr(s)            the owner's own texts (story, rooms, FAQ…): their translation in data.i18n[lang][english],
+                         else DICT (default kinds/titles), else the English as written
+     NS.siteLangs(data)  ['en'] + the languages the owner switched on (data.langs)
+     NS.setLang(code, data)
+   Translations of the owner's texts are keyed by the English text itself, so a changed English sentence simply
+   shows in English until it is translated again (no wrong, out-of-date translation). The editor's Languages tab
+   (theme/assets/ns-editor.js) fills data.i18n.
+   DICT: English -> [Latvian, Russian, German]. Place names are never declined: the sentences are built so a name
+   can stand as it is ("Kafija: X", «X»). Add a line here for every new English string the renderer shows. */
+(function () {
+  'use strict';
+  var NS = window.NSSite;
+  NS.LANGS = {
+    en: { name: 'English', short: 'EN', locale: 'en_GB' },
+    lv: { name: 'Latviešu', short: 'LV', locale: 'lv_LV' },
+    ru: { name: 'Русский', short: 'RU', locale: 'ru_RU' },
+    de: { name: 'Deutsch', short: 'DE', locale: 'de_DE' }
+  };
+  NS.LANG_ORDER = ['en', 'lv', 'ru', 'de'];
+  NS.lang = 'en';
+  var IDX = { lv: 0, ru: 1, de: 2 };
+  var owner = {};   // data.i18n[NS.lang] of the site being drawn
+
+  var DICT = {
+    /* ---------------------------------------------------------------- frame */
+    "Rooms": ["Numuri", "Номера", "Zimmer"],
+    "Your stay": ["Jūsu brauciens", "Ваша поездка", "Ihr Aufenthalt"],
+    "Neighbourhood": ["Apkārtne", "Окрестности", "Umgebung"],
+    "Booking": ["Rezervācija", "Бронирование", "Buchung"],
+    "Book": ["Rezervēt", "Забронировать", "Buchen"],
+    "Menu": ["Izvēlne", "Меню", "Menü"],
+    "Contact": ["Kontakti", "Контакты", "Kontakt"],
+    "Language": ["Valoda", "Язык", "Sprache"],
+    "Show everything": ["Rādīt visu", "Показать всё", "Alles zeigen"],
+    "Photo and data credits": ["Foto un datu avoti", "Источники фото и данных", "Foto- und Datenquellen"],
+    "Website made with {platform}": ["Mājaslapa veidota ar {platform}", "Сайт создан в {platform}", "Website erstellt mit {platform}"],
+    "Scroll down": ["Ritināt uz leju", "Прокрутить вниз", "Nach unten scrollen"],
+    "Hotel": ["Viesnīca", "Отель", "Hotel"],
+    "Your hotel": ["Jūsu viesnīca", "Ваш отель", "Ihr Hotel"],
+    "Close": ["Aizvērt", "Закрыть", "Schließen"],
+    "Previous": ["Iepriekšējā", "Назад", "Zurück"],
+    "Next": ["Nākamā", "Вперёд", "Weiter"],
+
+    /* ---------------------------------------------------------------- hero + profiles */
+    "Check availability": ["Pārbaudīt pieejamību", "Проверить наличие мест", "Verfügbarkeit prüfen"],
+    "Plan your stay": ["Plānot braucienu", "Спланировать поездку", "Aufenthalt planen"],
+    "For {who}:": ["Ja esat {who}:", "Если вы — {who}:", "Als {who}:"],
+    "Made for you": ["Veidots jums", "Специально для вас", "Für Sie gemacht"],
+    "Who is coming?": ["Kas brauc?", "Кто едет?", "Wer kommt?"],
+    "Pick the traveller you are. The whole page rearranges itself: rooms, places, and a stay planned hour by hour.": [
+      "Izvēlieties, kāds ceļotājs esat. Visa lapa pielāgojas jums: numuri, vietas un brauciens, saplānots pa stundām.",
+      "Выберите, какой вы путешественник. Вся страница подстроится под вас: номера, места и поездка, расписанная по часам.",
+      "Wählen Sie, welcher Reisetyp Sie sind. Die ganze Seite passt sich an: Zimmer, Orte und ein Aufenthalt, Stunde für Stunde geplant."],
+    "Choose your kind of trip": ["Izvēlieties brauciena veidu", "Выберите тип поездки", "Wählen Sie Ihre Art zu reisen"],
+    "Everyone": ["Visiem", "Для всех", "Alle"],
+    "Show me everything": ["Parādiet man visu", "Покажите мне всё", "Alles anzeigen"],
+    "Showing the site for {who}.": ["Lapa parādīta: {who}.", "Сайт показан для: {who}.", "Die Seite für: {who}."],
+    "See your stay": ["Skatīt jūsu braucienu", "Посмотреть вашу поездку", "Ihren Aufenthalt ansehen"],
+
+    /* ---------------------------------------------------------------- sections */
+    "Our story": ["Mūsu stāsts", "Наша история", "Unsere Geschichte"],
+    "Welcome": ["Laipni lūdzam", "Добро пожаловать", "Willkommen"],
+    "Why stay here": ["Kāpēc šeit", "Почему здесь", "Warum hier"],
+    "The best address in the neighbourhood": ["Labākā adrese apkārtnē", "Лучший адрес в округе", "Die beste Adresse im Viertel"],
+    "for you": ["jums", "для вас", "für Sie"],
+    "Sleep well": ["Labu nakti", "Спокойной ночи", "Gut schlafen"],
+    "Rooms are coming soon.": ["Numuri drīzumā būs redzami.", "Номера скоро появятся.", "Die Zimmer folgen in Kürze."],
+    "{room} photo {n}": ["{room}, foto {n}", "{room}, фото {n}", "{room}, Foto {n}"],
+    "Previous photo": ["Iepriekšējā foto", "Предыдущее фото", "Vorheriges Foto"],
+    "Next photo": ["Nākamā foto", "Следующее фото", "Nächstes Foto"],
+    "Photos coming soon": ["Foto drīzumā", "Фото скоро", "Fotos folgen"],
+    "Drawing of the room": ["Numura zīmējums", "Рисунок номера", "Zeichnung des Zimmers"],
+    "Up to {n}": ["Līdz {n}", "До {n}", "Bis {n}"],
+    "{n} photos": ["{n} foto", "Фото: {n}", "{n} Fotos"],
+    "3D tour": ["3D tūre", "3D-тур", "3D-Rundgang"],
+    "Video": ["Video", "Видео", "Video"],
+    "Perfect for you": ["Ideāli jums", "Идеально для вас", "Perfekt für Sie"],
+    "from {price} / night": ["no {price} / nakts", "от {price} / ночь", "ab {price} / Nacht"],
+    "Check dates": ["Pārbaudīt datumus", "Проверить даты", "Termine prüfen"],
+    "Tour {n}": ["Tūre {n}", "Тур {n}", "Rundgang {n}"],
+    "Drag to look around": ["Velciet, lai paskatītos apkārt", "Потяните, чтобы осмотреться", "Ziehen, um sich umzusehen"],
+    "Full screen": ["Pilnekrāns", "Во весь экран", "Vollbild"],
+    "Virtual tour": ["Virtuālā tūre", "Виртуальный тур", "Virtueller Rundgang"],
+    "Back": ["Atpakaļ", "Назад", "Zurück"],
+    "Walk on": ["Iet tālāk", "Идти дальше", "Weitergehen"],
+    "Look around": ["Paskatieties apkārt", "Осмотритесь", "Schauen Sie sich um"],
+    "Step inside": ["Ienāciet", "Заходите", "Treten Sie ein"],
+    "{room}: drag to look around.": ["{room}: velciet, lai paskatītos apkārt.", "{room}: потяните, чтобы осмотреться.", "{room}: ziehen, um sich umzusehen."],
+    "Gallery": ["Galerija", "Галерея", "Galerie"],
+    "A closer look": ["Tuvāk", "Поближе", "Genauer hingesehen"],
+    "Your stay, planned": ["Jūsu brauciens, saplānots", "Ваша поездка, уже спланирована", "Ihr Aufenthalt, geplant"],
+    "Your stay, hour by hour": ["Jūsu brauciens pa stundām", "Ваша поездка по часам", "Ihr Aufenthalt, Stunde für Stunde"],
+    "Written for the way you travel, from the places around us. Change the trip and watch it rewrite itself.": [
+      "Uzrakstīts tieši jūsu ceļošanas veidam, no vietām mums apkārt. Mainiet braucienu, un plāns pārrakstīsies pats.",
+      "Написано под ваш стиль путешествий, по местам вокруг нас. Измените поездку, и план перепишется сам.",
+      "Geschrieben für Ihre Art zu reisen, aus den Orten rund um uns. Ändern Sie die Reise, und der Plan schreibt sich neu."],
+    "Travelling as": ["Ceļoju kā", "Я путешествую как", "Ich reise als"],
+    "Nights": ["Naktis", "Ночей", "Nächte"],
+    "Season": ["Sezona", "Сезон", "Jahreszeit"],
+    "Day {n}": ["{n}. diena", "День {n}", "Tag {n}"],
+    "Show on map": ["Rādīt kartē", "Показать на карте", "Auf der Karte zeigen"],
+    "Google Maps": ["Google Maps", "Google Карты", "Google Maps"],
+    "Walk this day on the map": ["Izstaigāt šo dienu kartē", "Пройти этот день по карте", "Diesen Tag auf der Karte ablaufen"],
+    "Our pick for you: {room}": ["Mūsu izvēle jums: {room}", "Наш выбор для вас: {room}", "Unsere Wahl für Sie: {room}"],
+    "Book this stay": ["Rezervēt šo braucienu", "Забронировать эту поездку", "Diesen Aufenthalt buchen"],
+    "The neighbourhood": ["Apkārtne", "Окрестности", "Die Umgebung"],
+    "Everything is a short walk away": ["Viss ir pāris soļu attālumā", "Всё в нескольких шагах", "Alles ist nur ein paar Schritte entfernt"],
+    "Drag to turn · tap a pin for details": ["Velciet, lai pagrieztu · pieskarieties punktam", "Потяните, чтобы повернуть · нажмите на точку", "Ziehen zum Drehen · Punkt antippen für Details"],
+    "All": ["Visi", "Все", "Alle"],
+    "No places in this filter yet.": ["Šajā filtrā vietu vēl nav.", "В этом фильтре пока нет мест.", "In diesem Filter gibt es noch keine Orte."],
+    "{n} min": ["{n} min", "{n} мин", "{n} Min."],
+    "min": ["min", "мин", "Min."],
+    "Read more": ["Lasīt vairāk", "Читать дальше", "Mehr lesen"],
+    "Watch": ["Skatieties", "Смотрите", "Ansehen"],
+    "See it for yourself": ["Pārliecinieties paši", "Убедитесь сами", "Überzeugen Sie sich selbst"],
+    "Video {n}": ["Video {n}", "Видео {n}", "Video {n}"],
+    "Eat & drink": ["Ēst un dzert", "Еда и напитки", "Essen & Trinken"],
+    "See the menu": ["Skatīt ēdienkarti", "Посмотреть меню", "Zur Speisekarte"],
+    "Reserve a table": ["Rezervēt galdiņu", "Забронировать столик", "Tisch reservieren"],
+    "Guests say": ["Viesi saka", "Гости говорят", "Gäste sagen"],
+    "Loved by our guests": ["Mūsu viesu iecienīta", "Любимый отель наших гостей", "Von unseren Gästen geliebt"],
+    "{n} reviews": ["{n} atsauksmes", "Отзывов: {n}", "{n} Bewertungen"],
+    "A guest": ["Viesis", "Гость", "Ein Gast"],
+    "Book with confidence": ["Rezervējiet droši", "Бронируйте спокойно", "Sicher buchen"],
+    "How booking and payment work": ["Kā notiek rezervācija un apmaksa", "Как работают бронирование и оплата", "So funktionieren Buchung und Bezahlung"],
+    "Choose your dates": ["Izvēlieties datumus", "Выберите даты", "Wählen Sie Ihre Daten"],
+    "Check prices and availability on the booking site you trust, or contact us directly.": [
+      "Pārbaudiet cenas un brīvos numurus savā uzticamajā rezervāciju vietnē vai sazinieties ar mums tieši.",
+      "Проверьте цены и наличие мест на привычном сайте бронирования или свяжитесь с нами напрямую.",
+      "Prüfen Sie Preise und Verfügbarkeit auf der Buchungsseite Ihres Vertrauens oder kontaktieren Sie uns direkt."],
+    "Pay the way you like": ["Maksājiet, kā jums ērtāk", "Оплачивайте как удобно", "Bezahlen Sie, wie Sie möchten"],
+    "You pay when you book or at the hotel, depending on the rate you choose.": [
+      "Jūs maksājat rezervējot vai viesnīcā, atkarībā no izvēlētā tarifa.",
+      "Вы платите при бронировании или в отеле, в зависимости от выбранного тарифа.",
+      "Sie bezahlen bei der Buchung oder im Hotel, je nach gewähltem Tarif."],
+    "Arrive and relax": ["Ierodieties un atpūtieties", "Приезжайте и отдыхайте", "Ankommen und entspannen"],
+    "Check-in from {in}, check-out until {out}. We will have your room ready.": [
+      "Reģistrācija no {in}, izrakstīšanās līdz {out}. Jūsu numurs būs gatavs.",
+      "Заезд с {in}, выезд до {out}. Ваш номер будет готов.",
+      "Check-in ab {in}, Check-out bis {out}. Ihr Zimmer wartet auf Sie."],
+    "Good to know": ["Noderīgi zināt", "Полезно знать", "Gut zu wissen"],
+    "Questions guests ask": ["Viesu jautājumi", "Вопросы гостей", "Fragen unserer Gäste"],
+    "Didn't find your answer?": ["Neatradāt atbildi?", "Не нашли ответ?", "Keine Antwort gefunden?"],
+    "Ask us": ["Jautājiet mums", "Спросите нас", "Fragen Sie uns"],
+    "Find us": ["Kā mūs atrast", "Как нас найти", "So finden Sie uns"],
+    "Getting here": ["Kā nokļūt", "Как добраться", "Anreise"],
+    "Directions": ["Maršruts", "Маршрут", "Route"],
+
+    /* ---------------------------------------------------------------- the question form */
+    "Ask us a question": ["Uzdodiet mums jautājumu", "Задайте нам вопрос", "Stellen Sie uns eine Frage"],
+    "We usually answer within a day, by email.": ["Parasti atbildam dienas laikā, pa e-pastu.", "Обычно мы отвечаем в течение дня по электронной почте.", "Wir antworten meist innerhalb eines Tages per E-Mail."],
+    "Your name": ["Jūsu vārds", "Ваше имя", "Ihr Name"],
+    "Your email": ["Jūsu e-pasts", "Ваш e-mail", "Ihre E-Mail"],
+    "Your question": ["Jūsu jautājums", "Ваш вопрос", "Ihre Frage"],
+    "Send question": ["Sūtīt jautājumu", "Отправить вопрос", "Frage senden"],
+    "Sending…": ["Sūta…", "Отправка…", "Wird gesendet…"],
+    "Thank you! {hotel} will answer you by email soon.": ["Paldies! {hotel} drīz jums atbildēs pa e-pastu.", "Спасибо! {hotel} скоро ответит вам по электронной почте.", "Danke! {hotel} antwortet Ihnen bald per E-Mail."],
+    "Ask another question": ["Uzdot vēl vienu jautājumu", "Задать ещё вопрос", "Noch eine Frage stellen"],
+    "Your message goes only to {hotel}, who use your email to reply.": [
+      "Jūsu ziņa nonāk tikai pie {hotel}, un jūsu e-pasts tiek izmantots tikai atbildei.",
+      "Ваше сообщение получит только {hotel}; ваш e-mail нужен лишь для ответа.",
+      "Ihre Nachricht geht nur an {hotel}; Ihre E-Mail wird nur für die Antwort verwendet."],
+    "Please check your email address.": ["Lūdzu, pārbaudiet e-pasta adresi.", "Пожалуйста, проверьте адрес e-mail.", "Bitte prüfen Sie Ihre E-Mail-Adresse."],
+    "Please write a little more.": ["Lūdzu, uzrakstiet nedaudz vairāk.", "Пожалуйста, напишите чуть подробнее.", "Bitte schreiben Sie etwas mehr."],
+    "Too many questions right now. Please try again later, or email us.": [
+      "Pašlaik pārāk daudz jautājumu. Lūdzu, mēģiniet vēlāk vai rakstiet mums e-pastu.",
+      "Сейчас слишком много вопросов. Попробуйте позже или напишите нам на e-mail.",
+      "Gerade sind es zu viele Fragen. Bitte versuchen Sie es später oder schreiben Sie uns eine E-Mail."],
+    "Sorry, the question could not be sent. Please email us instead.": [
+      "Atvainojiet, jautājumu neizdevās nosūtīt. Lūdzu, rakstiet mums e-pastu.",
+      "Извините, вопрос не удалось отправить. Пожалуйста, напишите нам на e-mail.",
+      "Leider konnte die Frage nicht gesendet werden. Bitte schreiben Sie uns eine E-Mail."],
+    "The form works on the published site.": ["Forma darbojas publicētajā lapā.", "Форма работает на опубликованном сайте.", "Das Formular funktioniert auf der veröffentlichten Seite."],
+
+    /* ---------------------------------------------------------------- the reception QR card (ns-app.js NSApp.qrCard) */
+    "Scan to plan your stay": ["Skenējiet un plānojiet braucienu", "Отсканируйте и спланируйте поездку", "Scannen und Aufenthalt planen"],
+    "Your stay hour by hour, the neighbourhood map, and a place to ask us anything.": [
+      "Jūsu brauciens pa stundām, apkārtnes karte un vieta, kur uzdot mums jebkuru jautājumu.",
+      "Ваша поездка по часам, карта окрестностей и место, где можно задать нам любой вопрос.",
+      "Ihr Aufenthalt Stunde für Stunde, die Karte der Umgebung und ein Ort für all Ihre Fragen."],
+
+    /* ---------------------------------------------------------------- widgets */
+    "This 360° photo could not be loaded.": ["Šo 360° foto neizdevās ielādēt.", "Не удалось загрузить фото 360°.", "Dieses 360°-Foto konnte nicht geladen werden."],
+    "Open in Google Maps": ["Atvērt Google Maps", "Открыть в Google Картах", "In Google Maps öffnen"],
+    "Map of places around the hotel": ["Vietu karte ap viesnīcu", "Карта мест вокруг отеля", "Karte der Orte rund um das Hotel"],
+    "Illustrated map: directions are true, distances are walking minutes.": [
+      "Zīmēta karte: virzieni ir precīzi, attālumi ir minūtes kājām.",
+      "Рисованная карта: направления точные, расстояния в минутах пешком.",
+      "Gezeichnete Karte: Richtungen stimmen, Entfernungen sind Gehminuten."],
+    "Hotel video": ["Viesnīcas video", "Видео отеля", "Hotelvideo"],
+    "Room video": ["Numura video", "Видео номера", "Zimmervideo"],
+
+    /* ---------------------------------------------------------------- walking, seasons, numbers */
+    "1 min walk": ["1 min kājām", "1 мин пешком", "1 Min. zu Fuß"],
+    "{n} min walk": ["{n} min kājām", "{n} мин пешком", "{n} Min. zu Fuß"],
+    "{n} min by tram or taxi": ["{n} min ar tramvaju vai taksi", "{n} мин на трамвае или такси", "{n} Min. mit Tram oder Taxi"],
+    "Winter": ["Ziema", "Зима", "Winter"],
+    "Spring": ["Pavasaris", "Весна", "Frühling"],
+    "Summer": ["Vasara", "Лето", "Sommer"],
+    "Autumn": ["Rudens", "Осень", "Herbst"],
+    "on foot to {place}": ["kājām līdz {place}", "пешком до «{place}»", "zu Fuß zu {place}"],
+    "{things} within 10 minutes": ["{things} 10 minūšu attālumā", "{things} в 10 минутах", "{things} in 10 Minuten"],
+    "to {place}": ["līdz {place}", "до «{place}»", "zu {place}"],
+    "places within 15 minutes on foot": ["vietas 15 minūšu gājienā", "мест в 15 минутах пешком", "Orte in 15 Minuten zu Fuß"],
+
+    /* ---------------------------------------------------------------- place kinds: label, plural */
+    "Sight": ["Apskates vieta", "Достопримечательность", "Sehenswürdigkeit"],
+    "sights": ["apskates vietas", "достопримечательности", "Sehenswürdigkeiten"],
+    "Museum": ["Muzejs", "Музей", "Museum"],
+    "museums": ["muzeji", "музеи", "Museen"],
+    "galleries": ["galerijas", "галереи", "Galerien"],
+    "Church": ["Baznīca", "Церковь", "Kirche"],
+    "churches": ["baznīcas", "церкви", "Kirchen"],
+    "Stage & screen": ["Skatuve un kino", "Сцена и кино", "Bühne & Kino"],
+    "theatres & concert halls": ["teātri un koncertzāles", "театры и концертные залы", "Theater & Konzertsäle"],
+    "Café": ["Kafejnīca", "Кафе", "Café"],
+    "cafés": ["kafejnīcas", "кафе", "Cafés"],
+    "Restaurant": ["Restorāns", "Ресторан", "Restaurant"],
+    "restaurants": ["restorāni", "рестораны", "Restaurants"],
+    "Bar": ["Bārs", "Бар", "Bar"],
+    "bars & pubs": ["bāri un krodziņi", "бары и пабы", "Bars & Kneipen"],
+    "Nightlife": ["Naktsdzīve", "Ночная жизнь", "Nachtleben"],
+    "clubs & late venues": ["klubi un vēlās vietas", "клубы и ночные заведения", "Clubs & Nachtlokale"],
+    "Park": ["Parks", "Парк", "Park"],
+    "parks & gardens": ["parki un dārzi", "парки и сады", "Parks & Gärten"],
+    "Shop": ["Veikals", "Магазин", "Geschäft"],
+    "shops & boutiques": ["veikali un butiki", "магазины и бутики", "Geschäfte & Boutiquen"],
+    "Market & food shop": ["Tirgus un pārtika", "Рынок и продукты", "Markt & Feinkost"],
+    "markets & food shops": ["tirgi un pārtikas veikali", "рынки и продуктовые лавки", "Märkte & Feinkostläden"],
+    "Wellness": ["Labsajūta", "Велнес", "Wellness"],
+    "spas & wellness": ["spa un labsajūta", "спа и велнес", "Spas & Wellness"],
+    "Sport": ["Sports", "Спорт", "Sport"],
+    "gyms & sport": ["sporta zāles un sports", "спортзалы и спорт", "Fitness & Sport"],
+    "For kids": ["Bērniem", "Для детей", "Für Kinder"],
+    "places for kids": ["vietas bērniem", "места для детей", "Orte für Kinder"],
+    "Coworking": ["Kopstrādes telpa", "Коворкинг", "Coworking"],
+    "coworking spaces": ["kopstrādes telpas", "коворкинги", "Coworking-Spaces"],
+    "Transport": ["Transports", "Транспорт", "Verkehr"],
+    "stations & stops": ["stacijas un pieturas", "вокзалы и остановки", "Bahnhöfe & Haltestellen"],
+    "Essentials": ["Ikdienas lietas", "Самое нужное", "Das Nötigste"],
+    "pharmacies & ATMs": ["aptiekas un bankomāti", "аптеки и банкоматы", "Apotheken & Geldautomaten"],
+
+    /* place verbs ({n} = the place's name, never declined) */
+    "See {n}": ["Apskatiet: {n}", "Посмотрите «{n}»", "Sehen Sie {n}"],
+    "Stand in front of {n}": ["Pastāviet pie: {n}", "Постойте у «{n}»", "Stehen Sie vor {n}"],
+    "Wander over to {n}": ["Aizklīstiet līdz: {n}", "Прогуляйтесь до «{n}»", "Schlendern Sie zu {n}"],
+    "Explore {n}": ["Izpētiet: {n}", "Исследуйте «{n}»", "Entdecken Sie {n}"],
+    "An hour or two at {n}": ["Stunda vai divas: {n}", "Час-другой в «{n}»", "Ein, zwei Stunden in {n}"],
+    "Step into {n}": ["Ieejiet: {n}", "Загляните в «{n}»", "Treten Sie ein: {n}"],
+    "Browse {n}": ["Paraugieties: {n}", "Загляните в «{n}»", "Stöbern Sie in {n}"],
+    "Look in at {n}": ["Ieskatieties: {n}", "Зайдите в «{n}»", "Schauen Sie vorbei: {n}"],
+    "Visit {n}": ["Apmeklējiet: {n}", "Посетите «{n}»", "Besuchen Sie {n}"],
+    "Quiet moment at {n}": ["Kluss brīdis: {n}", "Тихая минута в «{n}»", "Ein stiller Moment: {n}"],
+    "Climb or look up at {n}": ["Uzkāpiet vai paskatieties augšup: {n}", "Поднимитесь или полюбуйтесь: «{n}»", "Hinaufsteigen oder hinaufschauen: {n}"],
+    "A performance at {n}": ["Izrāde: {n}", "Спектакль в «{n}»", "Eine Vorstellung: {n}"],
+    "Tickets for {n}": ["Biļetes: {n}", "Билеты в «{n}»", "Karten für {n}"],
+    "Coffee at {n}": ["Kafija: {n}", "Кофе в «{n}»", "Kaffee bei {n}"],
+    "Slow coffee at {n}": ["Nesteidzīga kafija: {n}", "Неспешный кофе в «{n}»", "Kaffee in Ruhe bei {n}"],
+    "Cake and coffee at {n}": ["Kūka un kafija: {n}", "Кофе с пирожным в «{n}»", "Kaffee und Kuchen bei {n}"],
+    "Eat at {n}": ["Paēdiet: {n}", "Поешьте в «{n}»", "Essen bei {n}"],
+    "A table at {n}": ["Galdiņš: {n}", "Столик в «{n}»", "Ein Tisch bei {n}"],
+    "Dinner at {n}": ["Vakariņas: {n}", "Ужин в «{n}»", "Abendessen bei {n}"],
+    "Drinks at {n}": ["Dzērieni: {n}", "Напитки в «{n}»", "Drinks bei {n}"],
+    "A glass at {n}": ["Glāze: {n}", "Бокал в «{n}»", "Ein Glas bei {n}"],
+    "Nightcap at {n}": ["Pēdējā glāze: {n}", "Последний бокал в «{n}»", "Absacker bei {n}"],
+    "Dance at {n}": ["Dejas: {n}", "Танцы в «{n}»", "Tanzen bei {n}"],
+    "Late night at {n}": ["Vēls vakars: {n}", "Поздний вечер в «{n}»", "Späte Stunden bei {n}"],
+    "Stroll through {n}": ["Pastaiga: {n}", "Прогулка по «{n}»", "Spaziergang durch {n}"],
+    "Fresh air in {n}": ["Svaigs gaiss: {n}", "Свежий воздух в «{n}»", "Frische Luft: {n}"],
+    "A bench in {n}": ["Soliņš: {n}", "Скамейка в «{n}»", "Eine Bank in {n}"],
+    "Shopping at {n}": ["Iepirkšanās: {n}", "Покупки в «{n}»", "Einkaufen bei {n}"],
+    "Pick up treats at {n}": ["Gardumi līdzi: {n}", "Вкусности в «{n}»", "Leckereien holen bei {n}"],
+    "Wander {n}": ["Izstaigājiet: {n}", "Побродите по «{n}»", "Bummeln Sie über {n}"],
+    "Unwind at {n}": ["Atpūta: {n}", "Расслабьтесь в «{n}»", "Entspannen bei {n}"],
+    "Treat yourself at {n}": ["Palutiniet sevi: {n}", "Побалуйте себя в «{n}»", "Gönnen Sie sich etwas: {n}"],
+    "Work out at {n}": ["Treniņš: {n}", "Тренировка в «{n}»", "Training bei {n}"],
+    "Swim or train at {n}": ["Peldēšana vai treniņš: {n}", "Плавание или тренировка в «{n}»", "Schwimmen oder trainieren: {n}"],
+    "Let the kids loose at {n}": ["Ļaujiet bērniem izskrieties: {n}", "Дайте детям порезвиться в «{n}»", "Kinder toben lassen: {n}"],
+    "Family time at {n}": ["Ģimenes laiks: {n}", "Время всей семьёй в «{n}»", "Familienzeit: {n}"],
+    "Work a few hours at {n}": ["Dažas darba stundas: {n}", "Пара рабочих часов в «{n}»", "Ein paar Stunden arbeiten: {n}"],
+    "Head to {n}": ["Dodieties uz: {n}", "Направляйтесь к «{n}»", "Weiter zu {n}"],
+    "Pop into {n}": ["Ieskrieniet: {n}", "Загляните в «{n}»", "Kurz rein: {n}"],
+
+    /* ---------------------------------------------------------------- describing a place */
+    "A café": ["Kafejnīca", "Кафе", "Ein Café"],
+    "A restaurant": ["Restorāns", "Ресторан", "Ein Restaurant"],
+    "A bar": ["Bārs", "Бар", "Eine Bar"],
+    "A late-night venue": ["Vieta vēlām stundām", "Ночное заведение", "Ein Ort für die späten Stunden"],
+    "A museum": ["Muzejs", "Музей", "Ein Museum"],
+    "A gallery": ["Galerija", "Галерея", "Eine Galerie"],
+    "A local landmark": ["Vietējā apskates vieta", "Местная достопримечательность", "Ein Wahrzeichen der Gegend"],
+    "A historic church": ["Vēsturiska baznīca", "Историческая церковь", "Eine historische Kirche"],
+    "A green space": ["Zaļā zona", "Зелёный уголок", "Eine grüne Oase"],
+    "A shop": ["Veikals", "Магазин", "Ein Geschäft"],
+    "A food shop": ["Pārtikas veikals", "Продуктовая лавка", "Ein Lebensmittelladen"],
+    "A place to unwind": ["Vieta atpūtai", "Место, чтобы расслабиться", "Ein Ort zum Entspannen"],
+    "A place to train": ["Vieta treniņiem", "Место для тренировок", "Ein Ort zum Trainieren"],
+    "Fun for children": ["Prieks bērniem", "Радость для детей", "Spaß für Kinder"],
+    "A coworking space": ["Kopstrādes telpa", "Коворкинг", "Ein Coworking-Space"],
+    "Transport link": ["Transporta mezgls", "Транспорт", "Verkehrsanbindung"],
+    "Everyday essentials": ["Ikdienas vajadzībām", "Всё необходимое", "Alles für den Alltag"],
+    "A stage for music and theatre": ["Skatuve mūzikai un teātrim", "Сцена для музыки и театра", "Eine Bühne für Musik und Theater"],
+    "Our tip: {note}": ["Mūsu padoms: {note}", "Наш совет: {note}", "Unser Tipp: {note}"],
+    "Plant-based dishes too.": ["Ir arī augu ēdieni.", "Есть и растительные блюда.", "Auch pflanzliche Gerichte."],
+
+    /* ---------------------------------------------------------------- the stay plan */
+    "the hotel": ["viesnīca", "отель", "das Hotel"],
+    "Wrap up warm: the old town glows in the snow.": ["Saģērbieties silti: vecpilsēta mirdz sniegā.", "Одевайтесь теплее: старый город сияет в снегу.", "Ziehen Sie sich warm an: Die Altstadt leuchtet im Schnee."],
+    "Evenings stay light until late, so take your time.": ["Vakari ilgi paliek gaiši, tāpēc nesteidzieties.", "Вечера светлые до поздна, так что не спешите.", "Die Abende bleiben lange hell, lassen Sie sich Zeit."],
+    "Café terraces start opening in spring.": ["Pavasarī atveras kafejnīcu terases.", "Весной открываются летние террасы кафе.", "Im Frühling öffnen die Café-Terrassen."],
+    "Golden trees and fewer crowds.": ["Zelta koki un mazāk ļaužu.", "Золотые деревья и меньше туристов.", "Goldene Bäume und weniger Trubel."],
+    "Breakfast at {hotel}": ["Brokastis: {hotel}", "Завтрак в «{hotel}»", "Frühstück im {hotel}"],
+    "Breakfast is included and served downstairs.": ["Brokastis ir iekļautas un tiek pasniegtas lejā.", "Завтрак включён и подаётся внизу.", "Das Frühstück ist inbegriffen und wird unten serviert."],
+    "A good start to the day.": ["Labs dienas sākums.", "Хорошее начало дня.", "Ein guter Start in den Tag."],
+    "Breakfast nearby": ["Brokastis tuvumā", "Завтрак рядом", "Frühstück in der Nähe"],
+    "Ask at the desk for our favourite breakfast spot.": ["Pajautājiet reģistratūrā par mūsu iecienītāko brokastu vietu.", "Спросите на ресепшене о нашем любимом месте для завтрака.", "Fragen Sie an der Rezeption nach unserem Lieblingsort fürs Frühstück."],
+    "Wander the neighbourhood": ["Izstaigājiet apkārtni", "Прогуляйтесь по округе", "Streifzug durchs Viertel"],
+    "Pick a street you have not walked yet. Everything here is close.": ["Izvēlieties ielu, pa kuru vēl neesat gājuši. Šeit viss ir tuvu.", "Выберите улицу, по которой ещё не гуляли. Здесь всё рядом.", "Nehmen Sie eine Straße, die Sie noch nicht kennen. Hier ist alles nah."],
+    "Ask us for a table nearby. We know the good ones.": ["Pajautājiet mums par galdiņu tuvumā. Mēs zinām labās vietas.", "Спросите нас о столике поблизости. Мы знаем хорошие места.", "Fragen Sie uns nach einem Tisch in der Nähe. Wir kennen die guten Adressen."],
+    "Lunch": ["Pusdienas", "Обед", "Mittagessen"],
+    "Dinner": ["Vakariņas", "Ужин", "Abendessen"],
+    "Pick up lunch at {place}": ["Pusdienas līdzi: {place}", "Обед с собой в «{place}»", "Mittagessen holen bei {place}"],
+    "Lunch at {place}": ["Pusdienas: {place}", "Обед в «{place}»", "Mittagessen bei {place}"],
+    "Dinner at {place}": ["Vakariņas: {place}", "Ужин в «{place}»", "Abendessen bei {place}"],
+    "Late night at {place}": ["Vēls vakars: {place}", "Поздний вечер в «{place}»", "Späte Stunden bei {place}"],
+    "Nightcap at {place}": ["Pēdējā glāze: {place}", "Последний бокал в «{place}»", "Absacker bei {place}"],
+    "Drinks at {place}": ["Dzērieni: {place}", "Напитки в «{place}»", "Drinks bei {place}"],
+    "Back by the fireplace": ["Atpakaļ pie kamīna", "Обратно к камину", "Zurück am Kamin"],
+    "End the day with a book by the lobby fire.": ["Noslēdziet dienu ar grāmatu pie kamīna vestibilā.", "Завершите день с книгой у камина в лобби.", "Beenden Sie den Tag mit einem Buch am Kamin in der Lobby."],
+    "Beautiful after dark, too.": ["Skaisti arī pēc tumsas iestāšanās.", "Красиво и после заката.", "Auch nach Einbruch der Dunkelheit schön."],
+    "An early night": ["Agri gulēt", "Ранний отбой", "Früh schlafen"],
+    "Sleep well: tomorrow there is more to see.": ["Guliet saldi: rīt būs vēl ko redzēt.", "Спокойной ночи: завтра будет ещё что посмотреть.", "Schlafen Sie gut: Morgen gibt es noch mehr zu sehen."],
+    "Check in at {hotel}": ["Reģistrācija: {hotel}", "Заселение в «{hotel}»", "Check-in im {hotel}"],
+    "Drop your bags, freshen up and pick up a map at the desk.": ["Atstājiet somas, atsvaidzinieties un paņemiet karti reģistratūrā.", "Оставьте сумки, освежитесь и возьмите карту на ресепшене.", "Taschen abstellen, frisch machen und an der Rezeption eine Karte mitnehmen."],
+    "First walk: {what}": ["Pirmā pastaiga: {what}", "Первая прогулка: {what}", "Erster Spaziergang: {what}"],
+    "To start the trip.": ["Brauciena sākumam.", "Для начала поездки.", "Zum Auftakt der Reise."],
+    "An aperitif at {place}": ["Aperitīvs: {place}", "Аперитив в «{place}»", "Ein Aperitif bei {place}"],
+    "Dinner downstairs at {place}": ["Vakariņas lejā: {place}", "Ужин внизу, в «{place}»", "Abendessen unten im {place}"],
+    "No need to go far on your first night.": ["Pirmajā vakarā nav jāiet tālu.", "В первый вечер не нужно далеко идти.", "Am ersten Abend müssen Sie nicht weit gehen."],
+    "Arrival": ["Ierašanās", "Приезд", "Anreise"],
+    "Before breakfast, while the streets are quiet.": ["Pirms brokastīm, kamēr ielas ir klusas.", "До завтрака, пока улицы тихие.", "Vor dem Frühstück, solange die Straßen ruhig sind."],
+    "Fast Wi-Fi and good coffee.": ["Ātrs Wi-Fi un laba kafija.", "Быстрый Wi-Fi и хороший кофе.", "Schnelles WLAN und guter Kaffee."],
+    "Warm up for a while.": ["Mazliet sasildieties.", "Немного согрейтесь.", "Wärmen Sie sich ein wenig auf."],
+    "Check what is on tonight: most performances start around 19:00.": ["Paskatieties, kas šovakar notiek: lielākā daļa izrāžu sākas ap 19:00.", "Посмотрите, что идёт сегодня: большинство спектаклей начинается около 19:00.", "Schauen Sie, was heute läuft: Die meisten Vorstellungen beginnen gegen 19:00."],
+    "An evening performance at {place}": ["Vakara izrāde: {place}", "Вечерний спектакль в «{place}»", "Eine Abendvorstellung: {place}"],
+    "A late supper after the show.": ["Vēlas vakariņas pēc izrādes.", "Поздний ужин после спектакля.", "Ein spätes Essen nach der Vorstellung."],
+    "Late supper at {place}": ["Vēlas vakariņas: {place}", "Поздний ужин в «{place}»", "Spätes Essen bei {place}"],
+    "Departure": ["Aizbraukšana", "Отъезд", "Abreise"],
+    "One last look before you go.": ["Pēdējais skats pirms aizbraukšanas.", "Последний взгляд перед отъездом.", "Ein letzter Blick vor der Abreise."],
+    "Check out": ["Izrakstīšanās", "Выезд", "Check-out"],
+    "Leave your bags with us and enjoy the rest of the day.": ["Atstājiet somas pie mums un baudiet atlikušo dienu.", "Оставьте сумки у нас и наслаждайтесь остатком дня.", "Lassen Sie Ihr Gepäck bei uns und genießen Sie den Rest des Tages."],
+    "Thank you for staying with us.": ["Paldies, ka bijāt pie mums.", "Спасибо, что остановились у нас.", "Danke, dass Sie bei uns waren."],
+    "To the airport": ["Uz lidostu", "В аэропорт", "Zum Flughafen"],
+    "{hotel} is {walk} from {place}": ["No {hotel} līdz {place} ir {walk}", "От «{hotel}» до «{place}» — {walk}", "Vom {hotel} sind es {walk} bis {place}"],
+    ", with {list} within ten minutes on foot.": [", un desmit minūšu gājienā: {list}.", ", а в десяти минутах пешком: {list}.", ", und in zehn Minuten zu Fuß: {list}."],
+    "{n} {things}": ["{things}: {n}", "{things} — {n}", "{n} {things}"],
+    " and ": [" un ", " и ", " und "],
+
+    /* ---------------------------------------------------------------- drafted texts (shown while the owner's are empty) */
+    "Welcome to {hotel}": ["Laipni lūdzam {hotel}", "Добро пожаловать в «{hotel}»", "Willkommen im {hotel}"],
+    ", in the heart of {area}": [", pašā {area} sirdī", ", в самом сердце района {area}", ", mitten in {area}"],
+    "our hotel": ["mūsu viesnīcā", "наш отель", "unserem Hotel"],
+    "From our door it is {list}. ": ["No mūsu durvīm: {list}. ", "От наших дверей: {list}. ", "Von unserer Tür sind es {list}. "],
+    "{walk} to {place}": ["{walk} līdz {place}", "{walk} до «{place}»", "{walk} bis {place}"],
+    "We are a small, personal hotel: we know our guests by name, and we love sharing the places we go ourselves.": [
+      "Mēs esam neliela, personiska viesnīca: mēs zinām savus viesus pēc vārda un labprāt dalāmies ar vietām, kur ejam paši.",
+      "Мы небольшой, уютный отель: знаем гостей по имени и с радостью делимся местами, куда ходим сами.",
+      "Wir sind ein kleines, persönliches Hotel: Wir kennen unsere Gäste beim Namen und teilen gern die Orte, an die wir selbst gehen."],
+    "the city": ["pilsēta", "город", "die Stadt"],
+    "Step outside and {area} is yours: {n} places within a fifteen-minute walk, including {cafes} cafés and {rest} restaurants within ten minutes": [
+      "Izejiet ārā, un {area} ir jūsu: {n} vietas piecpadsmit minūšu gājienā, tostarp desmit minūšu attālumā kafejnīcas ({cafes}) un restorāni ({rest})",
+      "Выйдите за дверь, и {area} ваш: мест в пятнадцати минутах пешком — {n}, из них в десяти минутах кафе ({cafes}) и рестораны ({rest})",
+      "Treten Sie hinaus, und {area} gehört Ihnen: {n} Orte in fünfzehn Gehminuten, darunter {cafes} Cafés und {rest} Restaurants in zehn Minuten"],
+    ", and {mus} museums": [", kā arī muzeji ({mus})", ", а также музеи ({mus})", " sowie {mus} Museen"],
+    ". Leave the car; you will not need it.": [". Atstājiet auto; tas jums nebūs vajadzīgs.", ". Оставьте машину: она вам не понадобится.", ". Lassen Sie das Auto stehen; Sie brauchen es nicht."],
+    "{n} minutes {label}": ["{n} minūtes {label}", "{n} мин {label}", "{n} Minuten {label}"],
+    "Right in the middle of everything, on a quiet street.": ["Pašā centrā, klusā ielā.", "В самом центре, на тихой улице.", "Mitten im Geschehen, in einer ruhigen Straße."],
+    "What time is check-in and check-out?": ["Cikos ir reģistrācija un izrakstīšanās?", "Во сколько заезд и выезд?", "Wann sind Check-in und Check-out?"],
+    "Check-in is from {in} and check-out is until {out}.": ["Reģistrācija no {in}, izrakstīšanās līdz {out}.", "Заезд с {in}, выезд до {out}.", "Check-in ab {in}, Check-out bis {out}."],
+    "Is breakfast included?": ["Vai brokastis ir iekļautas?", "Завтрак включён?", "Ist das Frühstück inbegriffen?"],
+    "Yes, breakfast is included.": ["Jā, brokastis ir iekļautas.", "Да, завтрак включён.", "Ja, das Frühstück ist inbegriffen."],
+    "When do I pay?": ["Kad man jāmaksā?", "Когда нужно платить?", "Wann bezahle ich?"],
+    "Is there parking?": ["Vai ir stāvvieta?", "Есть ли парковка?", "Gibt es Parkplätze?"],
+    "How do I get here from the airport?": ["Kā nokļūt šeit no lidostas?", "Как добраться из аэропорта?", "Wie komme ich vom Flughafen hierher?"],
+
+    /* ---------------------------------------------------------------- amenities, channels, payments, kinds */
+    "Breakfast included": ["Brokastis iekļautas", "Завтрак включён", "Frühstück inbegriffen"],
+    "Restaurant in the house": ["Restorāns viesnīcā", "Ресторан в отеле", "Restaurant im Haus"],
+    "Free Wi-Fi": ["Bezmaksas Wi-Fi", "Бесплатный Wi-Fi", "Kostenloses WLAN"],
+    "Lobby fireplace": ["Kamīns vestibilā", "Камин в лобби", "Kamin in der Lobby"],
+    "Guest library": ["Viesu bibliotēka", "Библиотека для гостей", "Gästebibliothek"],
+    "Bikes to rent": ["Velosipēdu noma", "Прокат велосипедов", "Fahrradverleih"],
+    "Lift": ["Lifts", "Лифт", "Aufzug"],
+    "Luggage storage": ["Bagāžas glabāšana", "Камера хранения", "Gepäckaufbewahrung"],
+    "Airport transfer": ["Transfērs no lidostas", "Трансфер из аэропорта", "Flughafentransfer"],
+    "Parking nearby": ["Stāvvieta tuvumā", "Парковка рядом", "Parken in der Nähe"],
+    "Cots for little ones": ["Gultiņas mazuļiem", "Детские кроватки", "Babybetten"],
+    "Pets welcome": ["Mājdzīvnieki laipni gaidīti", "Можно с животными", "Haustiere willkommen"],
+    "Step-free access": ["Piekļuve bez pakāpieniem", "Доступ без ступенек", "Stufenloser Zugang"],
+    "Late check-in": ["Vēla reģistrācija", "Поздний заезд", "Später Check-in"],
+    "Work desk": ["Darba galds", "Рабочий стол", "Schreibtisch"],
+    "Tea & coffee in rooms": ["Tēja un kafija numuros", "Чай и кофе в номерах", "Tee & Kaffee im Zimmer"],
+    "Quiet rooms": ["Klusi numuri", "Тихие номера", "Ruhige Zimmer"],
+    "Air conditioning": ["Gaisa kondicionieris", "Кондиционер", "Klimaanlage"],
+    "Sauna or spa": ["Pirts vai spa", "Сауна или спа", "Sauna oder Spa"],
+    "Gym": ["Sporta zāle", "Спортзал", "Fitnessraum"],
+    "24-hour reception": ["Diennakts reģistratūra", "Круглосуточный ресепшен", "Rezeption rund um die Uhr"],
+    "Tours & tickets desk": ["Ekskursijas un biļetes", "Экскурсии и билеты", "Touren & Tickets"],
+    "Book direct": ["Rezervēt tieši", "Забронировать напрямую", "Direkt buchen"],
+    "Call us": ["Zvaniet mums", "Позвоните нам", "Rufen Sie uns an"],
+    "Email us": ["Rakstiet mums", "Напишите нам", "Schreiben Sie uns"],
+    "Book online": ["Rezervēt tiešsaistē", "Забронировать онлайн", "Online buchen"],
+    "Cash": ["Skaidra nauda", "Наличные", "Bargeld"],
+    "Bank transfer": ["Bankas pārskaitījums", "Банковский перевод", "Banküberweisung"],
+    "Boutique hotel": ["Butika viesnīca", "Бутик-отель", "Boutique-Hotel"],
+    "Guesthouse": ["Viesu nams", "Гостевой дом", "Gästehaus"],
+    "Bed & breakfast": ["Viesu māja ar brokastīm", "Мини-отель с завтраком", "Bed & Breakfast"],
+    "Aparthotel": ["Apartviesnīca", "Апарт-отель", "Aparthotel"],
+    "Hostel": ["Hostelis", "Хостел", "Hostel"],
+    "Inn": ["Krogs ar naktsmājām", "Гостиница", "Gasthof"],
+    "Villa": ["Villa", "Вилла", "Villa"],
+
+    /* ---------------------------------------------------------------- the 30 guest profiles: name, line, hook */
+    "Art Nouveau Admirer": ["Jūgendstila cienītājs", "Ценитель модерна", "Jugendstil-Liebhaber"],
+    "Here for facades, stained glass and the curve of a staircase.": ["Brauc fasāžu, vitrāžu un kāpņu līkumu dēļ.", "Едет ради фасадов, витражей и изгибов лестниц.", "Kommt für Fassaden, Buntglas und den Schwung einer Treppe."],
+    "Wake up among the finest facades in Europe.": ["Mostieties starp Eiropas skaistākajām fasādēm.", "Просыпайтесь среди лучших фасадов Европы.", "Wachen Sie zwischen den schönsten Fassaden Europas auf."],
+    "History Buff": ["Vēstures mīļotājs", "Любитель истории", "Geschichtsfan"],
+    "Every cobblestone has a story, and they want all of them.": ["Katram bruģakmenim ir stāsts, un viņš grib dzirdēt visus.", "У каждого камня мостовой своя история, и он хочет услышать все.", "Jeder Pflasterstein hat eine Geschichte, und er will alle hören."],
+    "Centuries of history start at the front door.": ["Gadsimtiem sena vēsture sākas aiz durvīm.", "Века истории начинаются прямо за дверью.", "Jahrhunderte Geschichte beginnen vor der Haustür."],
+    "Foodie": ["Gardēdis", "Гурман", "Feinschmecker"],
+    "Plans the trip around lunch and dinner. Breakfast too.": ["Plāno braucienu ap pusdienām un vakariņām. Un brokastīm.", "Планирует поездку вокруг обедов и ужинов. И завтраков.", "Plant die Reise rund um Mittag- und Abendessen. Und Frühstück."],
+    "Your table is never more than a few minutes away.": ["Jūsu galdiņš vienmēr ir tikai dažu minūšu attālumā.", "Ваш столик всегда в паре минут.", "Ihr Tisch ist nie mehr als ein paar Minuten entfernt."],
+    "Coffee Lover": ["Kafijas cienītājs", "Любитель кофе", "Kaffeeliebhaber"],
+    "Judges a city by its flat whites and its cinnamon buns.": ["Vērtē pilsētu pēc tās kafijas un kanēļmaizītēm.", "Судит о городе по его флэт уайту и булочкам с корицей.", "Beurteilt eine Stadt nach ihrem Flat White und ihren Zimtschnecken."],
+    "A great cup of coffee around every corner.": ["Lieliska kafija aiz katra stūra.", "Отличный кофе за каждым углом.", "Großartiger Kaffee an jeder Ecke."],
+    "Romantic Couple": ["Romantisks pāris", "Романтичная пара", "Romantisches Paar"],
+    "Candle-lit dinners, late mornings, a walk by the water.": ["Vakariņas sveču gaismā, vēli rīti, pastaiga gar ūdeni.", "Ужины при свечах, поздние утра, прогулка у воды.", "Dinner bei Kerzenlicht, späte Morgen, ein Spaziergang am Wasser."],
+    "Candle-lit dinners and cobbled lanes for two.": ["Vakariņas sveču gaismā un bruģētas ieliņas diviem.", "Ужины при свечах и мощёные улочки для двоих.", "Dinner bei Kerzenlicht und Gassen für zwei."],
+    "Family with Kids": ["Ģimene ar bērniem", "Семья с детьми", "Familie mit Kindern"],
+    "Little legs, big curiosity, and snacks at all times.": ["Mazas kājiņas, liela ziņkārība un uzkodas vienmēr.", "Маленькие ножки, большое любопытство и перекусы всегда под рукой.", "Kleine Beine, große Neugier und immer Snacks dabei."],
+    "Short walks, big adventures, room for everyone.": ["Īsas pastaigas, lieli piedzīvojumi, vieta visiem.", "Короткие прогулки, большие приключения, место для всех.", "Kurze Wege, große Abenteuer, Platz für alle."],
+    "Business Traveller": ["Darba ceļotājs", "Деловой путешественник", "Geschäftsreisender"],
+    "Meetings by day, a good dinner and a quiet room by night.": ["Dienā tikšanās, vakarā labas vakariņas un kluss numurs.", "Днём встречи, вечером хороший ужин и тихий номер.", "Tagsüber Termine, abends ein gutes Essen und ein ruhiges Zimmer."],
+    "Close to everything, quiet when you need it.": ["Tuvu visam, klusi, kad tas vajadzīgs.", "Рядом со всем, тихо, когда нужно.", "Nah an allem, ruhig, wenn Sie es brauchen."],
+    "Digital Nomad": ["Digitālais nomads", "Цифровой кочевник", "Digitaler Nomade"],
+    "Laptop, good Wi-Fi, better coffee, a city to explore after five.": ["Klēpjdators, labs Wi-Fi, vēl labāka kafija un pilsēta, ko izpētīt pēc pieciem.", "Ноутбук, хороший Wi-Fi, кофе ещё лучше и город, который можно исследовать после пяти.", "Laptop, gutes WLAN, noch besserer Kaffee und eine Stadt zum Entdecken nach fünf."],
+    "Work from anywhere, then explore everything.": ["Strādājiet no jebkurienes, pēc tam izpētiet visu.", "Работайте откуда угодно, а потом исследуйте всё.", "Arbeiten Sie von überall, dann entdecken Sie alles."],
+    "Night Owl": ["Naktspūce", "Сова", "Nachteule"],
+    "The city really starts after 10 pm.": ["Pilsēta īsti sākas pēc desmitiem vakarā.", "Город по-настоящему оживает после десяти вечера.", "Die Stadt beginnt erst nach 22 Uhr richtig."],
+    "The bars are close, and so is your bed.": ["Bāri ir tuvu, un tāpat arī jūsu gulta.", "Бары рядом, и ваша кровать тоже.", "Die Bars sind nah, und Ihr Bett auch."],
+    "Concert & Opera Goer": ["Koncertu un operas apmeklētājs", "Любитель концертов и оперы", "Konzert- und Operngänger"],
+    "Has the opera schedule open in another tab.": ["Operas repertuārs jau atvērts citā cilnē.", "Афиша оперы уже открыта в соседней вкладке.", "Hat den Opernspielplan im anderen Tab offen."],
+    "Curtain up, then a short walk home.": ["Priekškars veras, pēc tam īsa pastaiga mājup.", "Занавес, а потом короткая прогулка домой.", "Vorhang auf, danach ein kurzer Weg nach Hause."],
+    "Shopper": ["Iepirkšanās mīļotājs", "Любитель шопинга", "Shopping-Fan"],
+    "Leaves with one more bag than they arrived with.": ["Aizbrauc ar vienu somu vairāk nekā atbrauca.", "Уезжает с одной сумкой больше, чем приехал.", "Reist mit einer Tasche mehr ab, als er gekommen ist."],
+    "Boutiques, markets and makers on your doorstep.": ["Butiki, tirgi un amatnieki pie jūsu durvīm.", "Бутики, рынки и мастера прямо у порога.", "Boutiquen, Märkte und Manufakturen vor der Tür."],
+    "Wellness Seeker": ["Labsajūtas meklētājs", "Ищущий гармонии", "Wellness-Suchender"],
+    "Saunas, slow mornings, green spaces and early nights.": ["Pirtis, nesteidzīgi rīti, zaļas vietas un agri vakari.", "Сауны, неспешные утра, зелень и ранний отбой.", "Saunen, ruhige Morgen, viel Grün und frühe Nächte."],
+    "Slow mornings, green parks, a city that breathes.": ["Nesteidzīgi rīti, zaļi parki, pilsēta, kas elpo.", "Неспешные утра, зелёные парки, город, который дышит.", "Ruhige Morgen, grüne Parks, eine Stadt, die atmet."],
+    "Morning Runner": ["Rīta skrējējs", "Утренний бегун", "Morgenläufer"],
+    "Laces up before breakfast and maps every route.": ["Pirms brokastīm sasien kurpes un izplāno katru maršrutu.", "Зашнуровывается до завтрака и прокладывает каждый маршрут.", "Schnürt vor dem Frühstück die Schuhe und plant jede Strecke."],
+    "Run the canal at sunrise, breakfast when you are back.": ["Skrējiens gar kanālu saullēktā, brokastis pēc atgriešanās.", "Пробежка вдоль канала на рассвете, завтрак по возвращении.", "Bei Sonnenaufgang am Kanal laufen, danach frühstücken."],
+    "Cyclist": ["Riteņbraucējs", "Велосипедист", "Radfahrer"],
+    "Sees the city on two wheels, from the river to the suburbs.": ["Redz pilsētu no diviem riteņiem, no upes līdz priekšpilsētām.", "Смотрит город с велосипеда, от реки до окраин.", "Erkundet die Stadt auf zwei Rädern, vom Fluss bis in die Vororte."],
+    "Grab a bike and the whole city is yours.": ["Paņemiet velosipēdu, un visa pilsēta ir jūsu.", "Берите велосипед, и весь город ваш.", "Schnappen Sie sich ein Rad, und die ganze Stadt gehört Ihnen."],
+    "Photographer": ["Fotogrāfs", "Фотограф", "Fotograf"],
+    "Chases golden hour, rooftops and quiet streets at dawn.": ["Medī zelta stundu, jumtus un klusas ielas rītausmā.", "Охотится за золотым часом, крышами и тихими улицами на рассвете.", "Jagt die goldene Stunde, Dächer und stille Straßen im Morgengrauen."],
+    "Golden hour starts outside your window.": ["Zelta stunda sākas aiz jūsu loga.", "Золотой час начинается за вашим окном.", "Die goldene Stunde beginnt vor Ihrem Fenster."],
+    "Budget Explorer": ["Taupīgs ceļotājs", "Экономный путешественник", "Sparfuchs"],
+    "Wants the most city for the least money.": ["Grib redzēt visvairāk par vismazāko naudu.", "Хочет увидеть больше всего за меньшие деньги.", "Will am meisten Stadt fürs wenigste Geld."],
+    "Walk everywhere. Spend it on experiences.": ["Ejiet visur kājām. Tērējiet piedzīvojumiem.", "Ходите везде пешком. Тратьте на впечатления.", "Gehen Sie überall zu Fuß. Geben Sie es für Erlebnisse aus."],
+    "Solo Traveller": ["Ceļotājs vienatnē", "Путешественник-одиночка", "Alleinreisender"],
+    "Their own pace, their own plans, and a good book.": ["Savs temps, savi plāni un laba grāmata.", "Свой темп, свои планы и хорошая книга.", "Eigenes Tempo, eigene Pläne und ein gutes Buch."],
+    "Your own pace, in a city that is easy to love.": ["Savā tempā, pilsētā, kuru ir viegli iemīlēt.", "В своём темпе, в городе, который легко полюбить.", "In Ihrem Tempo, in einer Stadt, die man leicht lieben kann."],
+    "Friends' Weekend": ["Draugu nedēļas nogale", "Выходные с друзьями", "Wochenende mit Freunden"],
+    "Three friends, two days, one group chat full of plans.": ["Trīs draugi, divas dienas un viena čata grupa, pilna plānu.", "Трое друзей, два дня и один групповой чат, полный планов.", "Drei Freunde, zwei Tage, ein Gruppenchat voller Pläne."],
+    "Dinner, drinks and stories you will retell for years.": ["Vakariņas, dzērieni un stāsti, ko stāstīsiet gadiem.", "Ужин, напитки и истории, которые вы будете пересказывать годами.", "Abendessen, Drinks und Geschichten, die Sie noch jahrelang erzählen."],
+    "Unhurried Travellers": ["Nesteidzīgi ceļotāji", "Неторопливые путешественники", "Gemütlich Reisende"],
+    "Retired, curious and in no rush at all.": ["Pensijā, ziņkārīgi un nekur nesteidzas.", "На пенсии, любознательны и никуда не спешат.", "Im Ruhestand, neugierig und ganz ohne Eile."],
+    "Everything worth seeing, within an easy stroll.": ["Viss, ko vērts redzēt, vieglas pastaigas attālumā.", "Всё, что стоит увидеть, в лёгкой прогулке.", "Alles Sehenswerte, gemütlich zu Fuß erreichbar."],
+    "Step-free Traveller": ["Ceļotājs bez pakāpieniem", "Путешественник без ступенек", "Stufenlos Reisende"],
+    "Needs smooth routes, lifts and no surprises.": ["Vajag līdzenus maršrutus, liftus un bez pārsteigumiem.", "Нужны ровные маршруты, лифты и никаких сюрпризов.", "Braucht ebene Wege, Aufzüge und keine Überraschungen."],
+    "Short, smooth routes and help when you need it.": ["Īsi, līdzeni maršruti un palīdzība, kad tā vajadzīga.", "Короткие ровные маршруты и помощь, когда нужна.", "Kurze, ebene Wege und Hilfe, wenn Sie sie brauchen."],
+    "Travelling with a Dog": ["Ceļojums ar suni", "Путешествие с собакой", "Reisen mit Hund"],
+    "The best friend comes too.": ["Labākais draugs brauc līdzi.", "Лучший друг едет с вами.", "Der beste Freund kommt mit."],
+    "Parks for them, cafés for you.": ["Parki viņam, kafejnīcas jums.", "Парки для него, кафе для вас.", "Parks für ihn, Cafés für Sie."],
+    "Winter & Christmas Market": ["Ziema un Ziemassvētku tirdziņš", "Зима и рождественская ярмарка", "Winter & Weihnachtsmarkt"],
+    "Mulled wine, candlelight and markets under falling snow.": ["Karstvīns, sveču gaisma un tirdziņi krītošā sniegā.", "Глинтвейн, свечи и ярмарки под падающим снегом.", "Glühwein, Kerzenlicht und Märkte im fallenden Schnee."],
+    "Christmas markets and candlelit cafés, a short walk away.": ["Ziemassvētku tirdziņi un kafejnīcas sveču gaismā, pāris soļu attālumā.", "Рождественские ярмарки и кафе при свечах в паре шагов.", "Weihnachtsmärkte und Cafés bei Kerzenlicht, nur ein paar Schritte entfernt."],
+    "White Nights Summer": ["Baltās naktis vasarā", "Лето белых ночей", "Sommer der hellen Nächte"],
+    "Long evenings, terraces and sunsets after ten.": ["Gari vakari, terases un saulrieti pēc desmitiem.", "Долгие вечера, террасы и закаты после десяти.", "Lange Abende, Terrassen und Sonnenuntergänge nach zehn."],
+    "Long light evenings on the terraces outside.": ["Gari, gaiši vakari uz terasēm turpat blakus.", "Долгие светлые вечера на террасах рядом.", "Lange helle Abende auf den Terrassen ringsum."],
+    "Craft Beer Fan": ["Amatniecības alus cienītājs", "Любитель крафтового пива", "Craft-Beer-Fan"],
+    "Has a list of breweries and taprooms to tick off.": ["Viņam ir saraksts ar alus darītavām un krogiem, ko apmeklēt.", "У него список пивоварен и тапрумов, которые надо обойти.", "Hat eine Liste von Brauereien und Taprooms zum Abhaken."],
+    "Taprooms and beer gardens within a short wander.": ["Alus krodziņi un dārzi īsas pastaigas attālumā.", "Пивные бары и сады в короткой прогулке.", "Taprooms und Biergärten nur einen kurzen Bummel entfernt."],
+    "Plant-based Eater": ["Augu ēdienu cienītājs", "Растительное питание", "Pflanzlich Essende"],
+    "Vegetarian or vegan, and always hunting the best menus.": ["Veģetārietis vai vegāns, vienmēr meklē labākās ēdienkartes.", "Вегетарианец или веган, всегда ищет лучшие меню.", "Vegetarisch oder vegan und immer auf der Suche nach den besten Speisekarten."],
+    "Fresh, green food all around the block.": ["Svaigs, zaļš ēdiens visapkārt.", "Свежая растительная еда по всему кварталу.", "Frisches, grünes Essen rund um den Block."],
+    "Short Layover": ["Īsa pārsēšanās", "Короткая пересадка", "Kurzer Zwischenstopp"],
+    "One night, a few hours of city, an early flight.": ["Viena nakts, dažas stundas pilsētā un agrs lidojums.", "Одна ночь, пара часов в городе и ранний рейс.", "Eine Nacht, ein paar Stunden Stadt, ein früher Flug."],
+    "One night is enough to fall for the city.": ["Ar vienu nakti pietiek, lai iemīlētu pilsētu.", "Одной ночи хватит, чтобы влюбиться в город.", "Eine Nacht reicht, um sich in die Stadt zu verlieben."],
+    "Ferry & Cruise Day": ["Prāmja un kruīza diena", "День с парома или круиза", "Fähr- & Kreuzfahrttag"],
+    "Arrives by sea and wants the highlights before sailing.": ["Ierodas pa jūru un grib redzēt labāko pirms atiešanas.", "Прибывает морем и хочет увидеть главное до отплытия.", "Kommt übers Meer und will die Highlights vor dem Ablegen sehen."],
+    "The best of the old town, then back to the port.": ["Labākais no vecpilsētas, tad atpakaļ uz ostu.", "Лучшее в старом городе, а потом обратно в порт.", "Das Beste der Altstadt, dann zurück zum Hafen."],
+    "Architecture Student": ["Arhitektūras students", "Студент-архитектор", "Architekturstudent"],
+    "Sketchbook in hand, from Gothic to Jugendstil to Soviet modern.": ["Ar skiču bloknotu rokā: no gotikas līdz jūgendstilam un padomju modernismam.", "С альбомом в руках: от готики до модерна и советского модернизма.", "Skizzenbuch in der Hand, von Gotik über Jugendstil bis zur sowjetischen Moderne."],
+    "Seven centuries of architecture in one walk.": ["Septiņi arhitektūras gadsimti vienā pastaigā.", "Семь веков архитектуры за одну прогулку.", "Sieben Jahrhunderte Architektur auf einem Spaziergang."],
+    "Event & Conference Visitor": ["Pasākuma vai konferences viesis", "Гость мероприятия или конференции", "Event- & Konferenzgast"],
+    "In town for an event, with evenings free.": ["Pilsētā pasākuma dēļ, vakari brīvi.", "В городе ради мероприятия, вечера свободны.", "Wegen eines Events in der Stadt, die Abende sind frei."],
+    "Walk to the venue, unwind in the old town.": ["Kājām līdz norises vietai, atpūta vecpilsētā.", "Пешком до площадки, отдых в старом городе.", "Zu Fuß zum Veranstaltungsort, entspannen in der Altstadt."],
+    "Long Stay": ["Ilga uzturēšanās", "Долгое пребывание", "Langer Aufenthalt"],
+    "Here for weeks: groceries, a gym and a favourite café matter.": ["Šeit uz nedēļām: svarīgs ir veikals, sporta zāle un iemīļota kafejnīca.", "Здесь на недели: важны продукты, спортзал и любимое кафе.", "Für Wochen hier: Supermarkt, Fitnessstudio und ein Lieblingscafé zählen."],
+    "Live like a local, from market to morning run.": ["Dzīvojiet kā vietējais: no tirgus līdz rīta skrējienam.", "Живите как местный: от рынка до утренней пробежки.", "Leben Sie wie ein Einheimischer, vom Markt bis zum Morgenlauf."]
+  };
+
+  NS.t = function (s, vars) {
+    var row = NS.lang !== 'en' ? DICT[s] : null;
+    var out = (row && row[IDX[NS.lang]]) || String(s == null ? '' : s);
+    if (vars) out = out.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; });
+    return out;
+  };
+  NS.th = function (s, vars) {
+    var out = NS.esc(NS.t(s));
+    if (vars) out = out.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; });
+    return out;
+  };
+  NS.tr = function (s) {
+    if (s == null || s === '' || NS.lang === 'en') return s;
+    var k = String(s);
+    if (owner[k]) return owner[k];
+    var row = DICT[k];
+    return (row && row[IDX[NS.lang]]) || s;
+  };
+  NS.hasWord = function (s) { return !!DICT[s]; };
+  NS.tIn = function (lang, s) { var row = DICT[s]; return (row && IDX[lang] != null && row[IDX[lang]]) || ''; };
+  NS.siteLangs = function (data) {
+    var on = (data && data.langs) || [];
+    return NS.LANG_ORDER.filter(function (c) { return c === 'en' || on.indexOf(c) >= 0; });
+  };
+  NS.setLang = function (code, data) {
+    NS.lang = NS.LANGS[code] ? code : 'en';
+    owner = (data && data.i18n && data.i18n[NS.lang]) || {};
+    return NS.lang;
+  };
+  /* Lower-case the first letter where the language allows it (German nouns keep their capital). */
+  NS.lcFirst = function (s) {
+    s = String(s || '');
+    return NS.lang === 'de' ? s : s.charAt(0).toLowerCase() + s.slice(1);
+  };
+  /* The language a guest's browser prefers, if the site offers it. */
+  NS.browserLang = function (offered) {
+    var prefs = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en']);
+    for (var i = 0; i < prefs.length; i++) {
+      var c = String(prefs[i] || '').slice(0, 2).toLowerCase();
+      if (offered.indexOf(c) >= 0) return c;
+    }
+    return null;
+  };
+})();
+
 /* Part 2: the stay engine. Pure functions over the site data: distances and walking times, how well the
    neighbourhood suits each guest profile (fit), "in numbers" facts, and the automatic hour-by-hour stay story.
    Deterministic: the same data, profile and options always give the same story. */
@@ -336,7 +923,7 @@
   };
   /* walking minutes: streets are ~30% longer than a straight line, 80 m a minute */
   NS.walkMin = function (m) { return Math.max(1, Math.round(m * 1.3 / 80)); };
-  NS.fmtWalk = function (min) { return min <= 1 ? '1 min walk' : min > 45 ? Math.round(min / 6) + ' min by tram or taxi' : min + ' min walk'; };
+  NS.fmtWalk = function (min) { return min <= 1 ? NS.t('1 min walk') : min > 45 ? NS.t('{n} min by tram or taxi', { n: Math.round(min / 6) }) : NS.t('{n} min walk', { n: min }); };
   NS.firstSentence = function (text, max) {
     text = String(text || '').replace(/\s+/g, ' ').trim();
     if (!text) return '';
@@ -426,17 +1013,17 @@
   NS.numbers = function (data, p) {
     var places = NS.places(data), out = [];
     var landmark = places.filter(function (x) { return x.cat === 'sight' && x.wiki; })[0] || NS.nearest(places, 'sight');
-    if (landmark) out.push({ n: landmark.walk, unit: 'min', label: 'on foot to ' + landmark.name, icon: 'walk' });
+    if (landmark) out.push({ n: landmark.walk, unit: NS.t('min'), label: NS.t('on foot to {place}', { place: landmark.name }), icon: 'walk' });
     var cats = p ? Object.keys(p.w).sort(function (a, b) { return p.w[b] - p.w[a]; }) : ['cafe', 'restaurant', 'museum', 'park', 'bar'];
     cats.forEach(function (cat) {
       if (out.length >= 4 || cat === 'transport' || cat === 'essentials') return;
       var n = NS.countWithin(places, cat, 10);
-      if (n >= 2) out.push({ n: n, unit: '', label: NS.CATS[cat].plural + ' within 10 minutes', icon: NS.CATS[cat].icon });
+      if (n >= 2) out.push({ n: n, unit: '', label: NS.t('{things} within 10 minutes', { things: NS.t(NS.CATS[cat].plural) }), icon: NS.CATS[cat].icon });
     });
     var st = NS.nearest(places, 'transport', function (x) { return /station|stacija|bahnhof|terminal|vokzal/i.test(x.name + ' ' + (x.sub || '')); });
-    if (st && out.length < 4) out.push({ n: st.walk, unit: 'min', label: 'to ' + st.name, icon: 'train' });
+    if (st && out.length < 4) out.push({ n: st.walk, unit: NS.t('min'), label: NS.t('to {place}', { place: st.name }), icon: 'train' });
     var total = places.filter(function (x) { return x.walk <= 15; }).length;
-    if (out.length < 4 && total) out.push({ n: total, unit: '', label: 'places within 15 minutes on foot', icon: 'pin' });
+    if (out.length < 4 && total) out.push({ n: total, unit: '', label: NS.t('places within 15 minutes on foot'), icon: 'pin' });
     return out.slice(0, 4);
   };
 
@@ -448,8 +1035,12 @@
     transport: 'Transport link', essentials: 'Everyday essentials', culture: 'A stage for music and theatre'
   };
   NS.describe = function (p) {
-    if (p.note) return 'Our tip: ' + p.note;
+    if (p.note) return NS.t('Our tip: {note}', { note: NS.tr(p.note) });
     if (p.wiki && p.wiki.extract) return NS.firstSentence(p.wiki.extract, 180);
+    if (NS.lang !== 'en') {
+      var sub = p.sub ? String(p.sub).replace(/_/g, ' ') : '';
+      return NS.t(SUB[p.cat]) + (sub ? ' (' + sub + ')' : '') + '.' + (p.diet ? ' ' + NS.t('Plant-based dishes too.') : '');
+    }
     if (p.sub) {
       var s = String(p.sub).replace(/_/g, ' ');
       if (p.cat === 'restaurant' || p.cat === 'cafe') return s.charAt(0).toUpperCase() + s.slice(1) + ' ' + (p.cat === 'cafe' ? 'café' : 'kitchen') + (p.diet ? ', with plant-based dishes' : '') + '.';
@@ -475,7 +1066,7 @@
   NS.story = function (data, pid, opts) {
     opts = opts || {};
     var p = NS.persona(pid) || NS.PERSONAS[0];
-    var hotel = data.hotel || {}, name = hotel.name || 'the hotel';
+    var hotel = data.hotel || {}, name = hotel.name || NS.t('the hotel');
     var nights = Math.max(1, Math.min(5, +opts.nights || p.nights || 2));
     var season = opts.season || p.season || NS.season(opts.date);
     var R = RHYTHM[p.rhythm] || RHYTHM.normal;
@@ -514,7 +1105,7 @@
     }
     function verb(pl) {
       var vs = NS.CATS[pl.cat].verbs;
-      return vs[Math.floor(rnd() * vs.length)].replace('{n}', pl.name);
+      return NS.t(vs[Math.floor(rnd() * vs.length)]).replace('{n}', pl.name);
     }
     function placeSlot(time, pl, extra, title) {
       return { time: time, cat: pl.cat, icon: NS.CATS[pl.cat].icon, title: title || verb(pl), text: NS.describe(pl) + (extra ? ' ' + extra : ''),
@@ -530,14 +1121,14 @@
     var breakfastIncluded = NS.hasFeature(data, 'breakfast');
 
     var flavour = {
-      winter: 'Wrap up warm: the old town glows in the snow.', summer: 'Evenings stay light until late, so take your time.',
-      spring: 'Café terraces start opening in spring.', autumn: 'Golden trees and fewer crowds.'
+      winter: NS.t('Wrap up warm: the old town glows in the snow.'), summer: NS.t('Evenings stay light until late, so take your time.'),
+      spring: NS.t('Café terraces start opening in spring.'), autumn: NS.t('Golden trees and fewer crowds.')
     };
 
     function breakfast(time) {
-      if (breakfastIncluded) return hotelSlot(time, 'cup', 'Breakfast at ' + name, hotel.breakfast || 'Breakfast is included and served downstairs.');
+      if (breakfastIncluded) return hotelSlot(time, 'cup', NS.t('Breakfast at {hotel}', { hotel: name }), NS.tr(hotel.breakfast) || NS.t('Breakfast is included and served downstairs.'));
       var c = pick(['cafe'], 8);
-      return c ? placeSlot(time, c, 'A good start to the day.') : hotelSlot(time, 'cup', 'Breakfast nearby', 'Ask at the desk for our favourite breakfast spot.');
+      return c ? placeSlot(time, c, NS.t('A good start to the day.')) : hotelSlot(time, 'cup', NS.t('Breakfast nearby'), NS.t('Ask at the desk for our favourite breakfast spot.'));
     }
     function activity(time, k, dayIndex, maxWalk) {
       for (var t = 0; t < activityCats.length; t++) {
@@ -546,86 +1137,86 @@
         if (pl) return placeSlot(time, pl);
       }
       var any = pick(activityCats);
-      return any ? placeSlot(time, any) : hotelSlot(time, 'walk', 'Wander the neighbourhood', 'Pick a street you have not walked yet. Everything here is close.');
+      return any ? placeSlot(time, any) : hotelSlot(time, 'walk', NS.t('Wander the neighbourhood'), NS.t('Pick a street you have not walked yet. Everything here is close.'));
     }
     function meal(time, cats, label) {
       var pl = pick(cats, 15 * pace);
-      if (!pl) return hotelSlot(time, 'fork', label, 'Ask us for a table nearby. We know the good ones.');
-      return placeSlot(time, pl, '', (pl.cat === 'market' ? 'Pick up lunch at ' : label + ' at ') + pl.name);
+      if (!pl) return hotelSlot(time, 'fork', NS.t(label), NS.t('Ask us for a table nearby. We know the good ones.'));
+      return placeSlot(time, pl, '', NS.t(pl.cat === 'market' ? 'Pick up lunch at {place}' : label + ' at {place}', { place: pl.name }));
     }
     function evening(time) {
       if (p.rhythm === 'late' || w.bar >= 2 || w.nightlife >= 2) {
         var b = pick(['bar', 'nightlife'], 15);
-        if (b) return placeSlot(time, b, '', (b.cat === 'nightlife' ? 'Late night at ' : rnd() < 0.5 ? 'Nightcap at ' : 'Drinks at ') + b.name);
+        if (b) return placeSlot(time, b, '', NS.t(b.cat === 'nightlife' ? 'Late night at {place}' : rnd() < 0.5 ? 'Nightcap at {place}' : 'Drinks at {place}', { place: b.name }));
       }
-      if (NS.hasFeature(data, 'fireplace')) return hotelSlot(time, 'fire', 'Back by the fireplace', 'End the day with a book by the lobby fire.');
+      if (NS.hasFeature(data, 'fireplace')) return hotelSlot(time, 'fire', NS.t('Back by the fireplace'), NS.t('End the day with a book by the lobby fire.'));
       var s = pick(['sight', 'church', 'park'], 10);
-      return s ? placeSlot(time, s, 'Beautiful after dark, too.') : hotelSlot(time, 'moon', 'An early night', 'Sleep well: tomorrow there is more to see.');
+      return s ? placeSlot(time, s, NS.t('Beautiful after dark, too.')) : hotelSlot(time, 'moon', NS.t('An early night'), NS.t('Sleep well: tomorrow there is more to see.'));
     }
 
     var days = [];
     // Arrival
     var arrive = hotel.checkin || '15:00';
-    var d0 = [hotelSlot(arrive, 'key', 'Check in at ' + name, (hotel.checkin_note || 'Drop your bags, freshen up and pick up a map at the desk.'))];
+    var d0 = [hotelSlot(arrive, 'key', NS.t('Check in at {hotel}', { hotel: name }), (NS.tr(hotel.checkin_note) || NS.t('Drop your bags, freshen up and pick up a map at the desk.')))];
     var first = activity(addMinutes(arrive, 60), 0, 0, 8);
-    first.title = 'First walk: ' + first.title.charAt(0).toLowerCase() + first.title.slice(1);
+    first.title = NS.t('First walk: {what}', { what: NS.lcFirst(first.title) });
     d0.push(first);
-    if (p.rhythm === 'late' || w.bar >= 1.5) { var ap = pick(['bar'], 10); if (ap) d0.push(placeSlot(R.evening, ap, 'To start the trip.', 'An aperitif at ' + ap.name)); }
+    if (p.rhythm === 'late' || w.bar >= 1.5) { var ap = pick(['bar'], 10); if (ap) d0.push(placeSlot(R.evening, ap, NS.t('To start the trip.'), NS.t('An aperitif at {place}', { place: ap.name }))); }
     if (inHouse && (w.restaurant >= 1 || nights === 1)) {
-      d0.push(hotelSlot(R.dinner, 'fork', 'Dinner downstairs at ' + data.dining.name,
-        NS.firstSentence(data.dining.short || data.dining.body || 'No need to go far on your first night.', 170)));
+      d0.push(hotelSlot(R.dinner, 'fork', NS.t('Dinner downstairs at {place}', { place: data.dining.name }),
+        NS.firstSentence(NS.tr(data.dining.short) || NS.tr(data.dining.body) || NS.t('No need to go far on your first night.'), 170)));
     } else d0.push(meal(R.dinner, mealCats, 'Dinner'));
     d0.push(evening(R.night));
-    days.push({ title: 'Arrival', slots: d0 });
+    days.push({ title: NS.t('Arrival'), slots: d0 });
 
     // Full days
     for (var d = 1; d < nights; d++) {
       var s = [breakfast(R.breakfast)];
-      if (p.id === 'runner' || w.sport >= 2) { var run = pick(['park', 'sport'], 15); if (run) s.unshift(placeSlot(addMinutes(R.breakfast, -60), run, 'Before breakfast, while the streets are quiet.')); }
-      if (w.coworking >= 2) { var cw = pick(['coworking', 'cafe'], 15); if (cw) s.push(placeSlot(R.morning, cw, 'Fast Wi-Fi and good coffee.')); }
+      if (p.id === 'runner' || w.sport >= 2) { var run = pick(['park', 'sport'], 15); if (run) s.unshift(placeSlot(addMinutes(R.breakfast, -60), run, NS.t('Before breakfast, while the streets are quiet.'))); }
+      if (w.coworking >= 2) { var cw = pick(['coworking', 'cafe'], 15); if (cw) s.push(placeSlot(R.morning, cw, NS.t('Fast Wi-Fi and good coffee.'))); }
       else s.push(activity(R.morning, 0, d));
       if (p.rhythm === 'early') s.push(activity(R.late, 1, d));
       s.push(meal(R.lunch, lunchCats, 'Lunch'));
       s.push(activity(R.afternoon, 2, d));
       var cf = pick(season === 'summer' && w.park ? ['park', 'cafe'] : (w.wellness >= 2 ? ['wellness', 'cafe'] : ['cafe']), 10);
-      if (cf) s.push(placeSlot(R.coffee, cf, season === 'winter' ? 'Warm up for a while.' : ''));
+      if (cf) s.push(placeSlot(R.coffee, cf, season === 'winter' ? NS.t('Warm up for a while.') : ''));
       if (w.shop >= 2) { var sh = pick(['shop', 'market'], 12); if (sh) s.push(placeSlot(R.evening, sh)); }
       var perf = w.culture >= 1.5 ? pick(['culture'], 20) : null;
       if (perf) {
-        s.push(placeSlot('19:00', perf, 'Check what is on tonight: most performances start around 19:00.', 'An evening performance at ' + perf.name));
+        s.push(placeSlot('19:00', perf, NS.t('Check what is on tonight: most performances start around 19:00.'), NS.t('An evening performance at {place}', { place: perf.name })));
         var sup = pick(['restaurant', 'bar'], 12);
-        if (sup) s.push(placeSlot('21:45', sup, 'A late supper after the show.', 'Late supper at ' + sup.name));
+        if (sup) s.push(placeSlot('21:45', sup, NS.t('A late supper after the show.'), NS.t('Late supper at {place}', { place: sup.name })));
       } else {
         s.push(meal(R.dinner, mealCats, 'Dinner'));
         s.push(evening(R.night));
       }
       if (R.late_night && (w.nightlife >= 2)) { var nl = pick(['nightlife', 'bar'], 15); if (nl) s.push(placeSlot(R.late_night, nl)); }
-      days.push({ title: 'Day ' + (d + 1), slots: s });
+      days.push({ title: NS.t('Day {n}', { n: d + 1 }), slots: s });
     }
 
     // Departure
     var out = hotel.checkout || '12:00';
     var dl = [breakfast(R.breakfast)];
     var last = pick(activityCats.slice(0, 3).concat(['cafe']), 8);
-    if (last) dl.push(placeSlot(addMinutes(out, -90), last, 'One last look before you go.'));
-    dl.push(hotelSlot(out, 'suitcase', 'Check out', NS.hasFeature(data, 'luggage') ? 'Leave your bags with us and enjoy the rest of the day.' : 'Thank you for staying with us.'));
+    if (last) dl.push(placeSlot(addMinutes(out, -90), last, NS.t('One last look before you go.')));
+    dl.push(hotelSlot(out, 'suitcase', NS.t('Check out'), NS.hasFeature(data, 'luggage') ? NS.t('Leave your bags with us and enjoy the rest of the day.') : NS.t('Thank you for staying with us.')));
     var station = NS.nearest(places, 'transport', function (x) { return /station|stacija|terminal|bus|airport/i.test(x.name + ' ' + (x.sub || '')); });
-    if (station) dl.push(placeSlot(addMinutes(out, 60), station, hotel.airport ? hotel.airport : ''));
-    else if (hotel.airport) dl.push(hotelSlot(addMinutes(out, 60), 'plane', 'To the airport', hotel.airport));
-    days.push({ title: 'Departure', slots: dl });
+    if (station) dl.push(placeSlot(addMinutes(out, 60), station, hotel.airport ? NS.tr(hotel.airport) : ''));
+    else if (hotel.airport) dl.push(hotelSlot(addMinutes(out, 60), 'plane', NS.t('To the airport'), NS.tr(hotel.airport)));
+    days.push({ title: NS.t('Departure'), slots: dl });
 
     // Intro, tips and rooms
     var landmark = places.filter(function (x) { return x.cat === 'sight' && x.wiki; })[0] || places.filter(function (x) { return w[x.cat] > 0; })[0];
     var top2 = activityCats.concat(['cafe', 'restaurant', 'bar']).filter(function (c, i, a) { return a.indexOf(c) === i && w[c] > 0; }).slice(0, 2);
     var counts = top2.map(function (c) { return { c: c, n: NS.countWithin(places, c, 10) }; }).filter(function (x) { return x.n > 0; });
-    var intro = ov.intro || (p.hook + ' ' + (landmark ? name + ' is ' + NS.fmtWalk(landmark.walk) + ' from ' + landmark.name +
-      (counts.length ? ', with ' + counts.map(function (x) { return x.n + ' ' + NS.CATS[x.c].plural; }).join(' and ') + ' within ten minutes on foot.' : '.') : ''));
+    var intro = NS.tr(ov.intro) || (NS.t(p.hook) + ' ' + (landmark ? NS.t('{hotel} is {walk} from {place}', { hotel: name, walk: NS.fmtWalk(landmark.walk), place: landmark.name }) +
+      (counts.length ? NS.t(', with {list} within ten minutes on foot.', { list: counts.map(function (x) { return NS.t('{n} {things}', { n: x.n, things: NS.t(NS.CATS[x.c].plural) }); }).join(NS.t(' and ')) }) : '.') : ''));
     var tips = [];
     (p.perks || []).forEach(function (k) {
       if (k === 'location' || !NS.hasFeature(data, k)) return;
-      tips.push({ icon: NS.FEATURES[k].icon, text: NS.FEATURES[k].label });
+      tips.push({ icon: NS.FEATURES[k].icon, text: NS.t(NS.FEATURES[k].label) });
     });
-    if (ov.tip) tips.unshift({ icon: 'sparkle', text: ov.tip, own: true });
+    if (ov.tip) tips.unshift({ icon: 'sparkle', text: NS.tr(ov.tip), own: true });
     tips.push({ icon: season === 'winter' ? 'snow' : season === 'summer' ? 'sun' : 'leaf', text: flavour[season] });
 
     var rooms = NS.roomsFor(data, p);
@@ -652,34 +1243,34 @@
     story: function (data) {
       var h = data.hotel || {}, places = NS.places(data);
       var lm = places.filter(function (x) { return x.cat === 'sight' && x.wiki; }).slice(0, 2);
-      return 'Welcome to ' + (h.name || 'our hotel') + (h.area ? ', in the heart of ' + h.area : '') + '. ' +
-        (h.building ? h.building + ' ' : '') +
-        (lm.length ? 'From our door it is ' + lm.map(function (x) { return NS.fmtWalk(x.walk) + ' to ' + x.name; }).join(' and ') + '. ' : '') +
-        'We are a small, personal hotel: we know our guests by name, and we love sharing the places we go ourselves.';
+      return NS.t('Welcome to {hotel}', { hotel: h.name || NS.t('our hotel') }) + (h.area ? NS.t(', in the heart of {area}', { area: h.area }) : '') + '. ' +
+        (h.building ? NS.tr(h.building) + ' ' : '') +
+        (lm.length ? NS.t('From our door it is {list}. ', { list: lm.map(function (x) { return NS.t('{walk} to {place}', { walk: NS.fmtWalk(x.walk), place: x.name }); }).join(NS.t(' and ')) }) : '') +
+        NS.t('We are a small, personal hotel: we know our guests by name, and we love sharing the places we go ourselves.');
     },
     neighborhood: function (data) {
       var h = data.hotel || {}, places = NS.places(data);
       var n15 = places.filter(function (x) { return x.walk <= 15; }).length;
       var cafes = NS.countWithin(places, 'cafe', 10), rest = NS.countWithin(places, 'restaurant', 10), mus = NS.countWithin(places, 'museum', 15);
-      return 'Step outside and ' + (h.area || 'the city') + ' is yours: ' + n15 + ' places within a fifteen-minute walk, including ' +
-        cafes + ' cafés and ' + rest + ' restaurants within ten minutes' + (mus ? ', and ' + mus + ' museums' : '') + '. Leave the car; you will not need it.';
+      return NS.t('Step outside and {area} is yours: {n} places within a fifteen-minute walk, including {cafes} cafés and {rest} restaurants within ten minutes',
+        { area: h.area || NS.t('the city'), n: n15, cafes: cafes, rest: rest }) + (mus ? NS.t(', and {mus} museums', { mus: mus }) : '') + NS.t('. Leave the car; you will not need it.');
     },
     highlights: function (data) {
       var feats = NS.get(data, 'hotel.features', []) || [];
       var out = [];
       var nums = NS.numbers(data);
-      if (nums[0]) out.push({ icon: 'walk', title: nums[0].n + ' minutes ' + nums[0].label.replace(/^on foot /, 'on foot '), text: 'Right in the middle of everything, on a quiet street.' });
-      feats.slice(0, 5).forEach(function (k) { if (NS.FEATURES[k]) out.push({ icon: NS.FEATURES[k].icon, title: NS.FEATURES[k].label, text: '' }); });
+      if (nums[0]) out.push({ icon: 'walk', title: NS.t('{n} minutes {label}', { n: nums[0].n, label: nums[0].label }), text: NS.t('Right in the middle of everything, on a quiet street.') });
+      feats.slice(0, 5).forEach(function (k) { if (NS.FEATURES[k]) out.push({ icon: NS.FEATURES[k].icon, title: NS.t(NS.FEATURES[k].label), text: '' }); });
       return out.slice(0, 6);
     },
     faq: function (data) {
       var h = data.hotel || {}, b = data.booking || {};
       var out = [];
-      if (h.checkin || h.checkout) out.push({ q: 'What time is check-in and check-out?', a: 'Check-in is from ' + (h.checkin || '15:00') + ' and check-out is until ' + (h.checkout || '12:00') + '.' });
-      if (NS.hasFeature(data, 'breakfast')) out.push({ q: 'Is breakfast included?', a: h.breakfast || 'Yes, breakfast is included.' });
-      if (NS.get(b, 'payment.when')) out.push({ q: 'When do I pay?', a: b.payment.when });
-      if (h.parking) out.push({ q: 'Is there parking?', a: h.parking });
-      if (h.airport) out.push({ q: 'How do I get here from the airport?', a: h.airport });
+      if (h.checkin || h.checkout) out.push({ q: NS.t('What time is check-in and check-out?'), a: NS.t('Check-in is from {in} and check-out is until {out}.', { 'in': h.checkin || '15:00', out: h.checkout || '12:00' }) });
+      if (NS.hasFeature(data, 'breakfast')) out.push({ q: NS.t('Is breakfast included?'), a: NS.tr(h.breakfast) || NS.t('Yes, breakfast is included.') });
+      if (NS.get(b, 'payment.when')) out.push({ q: NS.t('When do I pay?'), a: NS.tr(b.payment.when) });
+      if (h.parking) out.push({ q: NS.t('Is there parking?'), a: NS.tr(h.parking) });
+      if (h.airport) out.push({ q: NS.t('How do I get here from the airport?'), a: NS.tr(h.airport) });
       return out;
     }
   };
@@ -689,10 +1280,13 @@
    NSSite.mount(root, data, opts) draws the whole site into root and returns {update(data), setPersona(id), destroy()}.
    NSSite.boot(data, opts) is what a hosted or exported page calls: it mounts into #ns-root.
    opts: mode 'live' | 'preview' | 'export'; media {m: base url for "m:KEY" uploads, a: base url for "a:file" starter
-   photos}; stats (url to ping, live only); slug; platform {name, url}; lib {maplibre, maplibreCss}; noMap; persona. */
+   photos}; stats (url to ping, live only); slug; platform {name, url}; lib {maplibre, maplibreCss}; noMap; persona;
+   lang (en | lv | ru | de: the language to start in, see 15-i18n.js); ask (url of the guest question endpoint).
+   Every word the site shows goes through T() (NSSite.t, the built-in dictionary) or TR() (NSSite.tr, the owner's own
+   texts and their translations). The "Ask us a question" form sits in the contact section (data.contact.ask_off hides it). */
 (function () {
   'use strict';
-  var NS = window.NSSite, e = NS.esc, ic = NS.icon;
+  var NS = window.NSSite, e = NS.esc, ic = NS.icon, T = NS.t, TH = NS.th, TR = NS.tr;
 
   /* ------------------------------------------------------------------ media + text helpers */
   NS.src = function (ref, opts) {
@@ -745,7 +1339,7 @@
     var bed = beds === 2
       ? '<rect x="70" y="150" width="70" height="38" rx="6"/><rect x="160" y="150" width="70" height="38" rx="6"/><path d="M70 150v-22a10 10 0 0 1 10-10h50a10 10 0 0 1 10 10v22M160 150v-22a10 10 0 0 1 10-10h50a10 10 0 0 1 10 10v22"/>'
       : '<rect x="80" y="148" width="140" height="40" rx="8"/><path d="M80 148v-24c0-16 14-28 30-28h80c16 0 30 12 30 28v24"/><path d="M96 148v-12a8 8 0 0 1 8-8h36a8 8 0 0 1 8 8v12M152 148v-12a8 8 0 0 1 8-8h36a8 8 0 0 1 8 8v12"/>';
-    return '<svg class="ns-roomart v' + (i % 3) + '" viewBox="0 0 300 220" role="img" aria-label="Drawing of the room"><rect class="wall" width="300" height="220"/>' +
+    return '<svg class="ns-roomart v' + (i % 3) + '" viewBox="0 0 300 220" role="img" aria-label="' + e(T('Drawing of the room')) + '"><rect class="wall" width="300" height="220"/>' +
       '<path class="win" d="M196 112V52a32 32 0 0 1 64 0v60z"/><path d="M228 20v92M196 70h64"/>' +
       '<path class="floor" d="M0 188h300v32H0z"/><path d="M0 188h300"/>' + bed +
       '<path d="M40 188v-56M28 132h24l-4-22H32z"/><path d="M262 188c-2-26 6-40 18-48M262 188c4-16 2-30-8-42"/></svg>';
@@ -756,8 +1350,14 @@
     opts = opts || {};
     var S = {
       root: root, data: data, opts: opts, persona: null, nights: null, season: null, day: 0, filter: null,
-      widgets: [], map: null, mapEl: null
+      widgets: [], map: null, mapEl: null, askOpened: Date.now()
     };
+    (function () {   // the language to start in: the page's choice, the address, the guest's last pick, their browser
+      var offered = NS.siteLangs(data), want = opts.lang || (location.search.match(/[?&]lang=([a-z]{2})/) || [])[1] || null;
+      if (!want && opts.mode !== 'preview') { try { want = localStorage.getItem('ns.lang.' + (opts.slug || '')); } catch (x) {} }
+      if (!want && opts.mode !== 'preview') want = NS.browserLang(offered);
+      NS.setLang(offered.indexOf(want) >= 0 || (opts.mode === 'preview' && NS.LANGS[want]) ? want : 'en', data);
+    })();
     var startPersona = opts.persona || (location.hash.match(/for=([a-z]+)/) || [])[1] || null;
     if (!startPersona) { try { startPersona = sessionStorage.getItem('ns.persona.' + (opts.slug || '')); } catch (x) {} }
     if (startPersona && NS.persona(startPersona)) S.persona = startPersona;
@@ -768,7 +1368,7 @@
     }
     function sectionTitle(id, dflt) {
       var s = (data.sections || []).filter(function (x) { return x.id === id; })[0];
-      return (s && s.title) || dflt;
+      return TR((s && s.title) || dflt);
     }
     function mediaSrc(ref) { return NS.src(ref, opts); }
     function primaryChannel() {
@@ -777,14 +1377,19 @@
     }
     function bookBtn(cls, label) {
       var c = primaryChannel();
-      if (!c) return '<a class="ns-btn ' + (cls || '') + '" href="#ns-booking">' + e(label || 'Check availability') + '</a>';
-      return '<a class="ns-btn ' + (cls || '') + '" href="' + e(c.url) + '" target="_blank" rel="noopener">' + e(label || 'Check availability') + ic('arrow') + '</a>';
+      if (!c) return '<a class="ns-btn ' + (cls || '') + '" href="#ns-booking">' + e(T(label || 'Check availability')) + '</a>';
+      return '<a class="ns-btn ' + (cls || '') + '" href="' + e(c.url) + '" target="_blank" rel="noopener">' + e(T(label || 'Check availability')) + ic('arrow') + '</a>';
     }
     function head(id, eyebrow, title, lead) {
-      return '<header class="ns-head">' + (eyebrow ? '<div class="ns-eyebrow">' + e(eyebrow) + '</div>' : '') +
+      return '<header class="ns-head">' + (eyebrow ? '<div class="ns-eyebrow">' + e(TR(eyebrow)) + '</div>' : '') +
         '<h2>' + e(sectionTitle(id, title)) + '</h2>' + (lead ? '<div class="ns-lead">' + lead + '</div>' : '') + NS.orn.divider() + '</header>';
     }
     function persona() { return S.persona ? NS.persona(S.persona) : null; }
+    function heroFor(p) {
+      var who = NS.lang === 'en' ? p.name.toLowerCase().replace(/^the /, '') : NS.lcFirst(T(p.name));
+      return '<p class="ns-hero-for">' + ic(p.icon) + '<span><b>' + e(T('For {who}:', { who: who })) + '</b> ' + e(T(p.hook)) + '</span></p>';
+    }
+    function askOn() { return !NS.get(data, 'contact.ask_off', false); }
 
     /* ---------------------------------------------------------------- sections */
     var SECTIONS = {
@@ -793,7 +1398,7 @@
         var kind = hero.kind || 'photo', media = '';
         if (kind === 'video' && hero.video) {
           var vi = NS.videoInfo(mediaSrc(hero.video));
-          media = vi.type === 'youtube' ? '<iframe class="ns-hero-yt" src="https://www.youtube-nocookie.com/embed/' + e(vi.id) + '?autoplay=1&mute=1&loop=1&controls=0&playsinline=1&playlist=' + e(vi.id) + '" allow="autoplay" title="Hotel video" tabindex="-1"></iframe>'
+          media = vi.type === 'youtube' ? '<iframe class="ns-hero-yt" src="https://www.youtube-nocookie.com/embed/' + e(vi.id) + '?autoplay=1&mute=1&loop=1&controls=0&playsinline=1&playlist=' + e(vi.id) + '" allow="autoplay" title="' + e(T('Hotel video')) + '" tabindex="-1"></iframe>'
             : '<video class="ns-hero-media" src="' + e(vi.src) + (hero.start ? '#t=' + (+hero.start) : '') + '" autoplay muted loop playsinline' + (hero.image ? ' poster="' + e(mediaSrc(hero.image)) + '"' : '') + ' data-start="' + (+hero.start || 0) + '" data-end="' + (+hero.end || 0) + '"></video>';
         } else if (kind === 'film') {
           media = '<div class="ns-film" data-film></div>';
@@ -806,33 +1411,33 @@
         var arch = hero.style === 'arch';
         return '<div class="ns-hero-in' + (arch ? ' arch' : '') + '">' +
           '<div class="ns-hero-bg">' + media + '<div class="ns-hero-shade"></div></div>' + NS.orn.corner('tl') + NS.orn.corner('tr') +
-          '<div class="ns-hero-text"><div class="ns-eyebrow">' + (h.stars ? '<span class="ns-stars">' + stars(h.stars) + '</span> ' : '') + e([h.kind || 'Hotel', h.area || h.city].filter(Boolean).join(' · ')) + '</div>' +
-          '<h1>' + e(h.name || 'Your hotel') + '</h1>' +
-          '<p class="ns-hero-line">' + e(hero.headline || h.tagline || '') + '</p>' +
-          (p ? '<p class="ns-hero-for">' + ic(p.icon) + '<span><b>For ' + e(p.name.toLowerCase().replace(/^the /, '')) + ':</b> ' + e(p.hook) + '</span></p>' : '') +
-          '<div class="ns-hero-cta"><a class="ns-btn light" href="#ns-' + (has('personas') ? 'personas' : has('stay') ? 'stay' : 'rooms') + '">' + ic('route') + 'Plan your stay</a>' + bookBtn('primary') + '</div>' +
+          '<div class="ns-hero-text"><div class="ns-eyebrow">' + (h.stars ? '<span class="ns-stars">' + stars(h.stars) + '</span> ' : '') + e([TR(h.kind || 'Hotel'), TR(h.area) || h.city].filter(Boolean).join(' · ')) + '</div>' +
+          '<h1>' + e(h.name || T('Your hotel')) + '</h1>' +
+          '<p class="ns-hero-line">' + e(TR(hero.headline || h.tagline || '')) + '</p>' +
+          (p ? heroFor(p) : '') +
+          '<div class="ns-hero-cta"><a class="ns-btn light" href="#ns-' + (has('personas') ? 'personas' : has('stay') ? 'stay' : 'rooms') + '">' + ic('route') + e(T('Plan your stay')) + '</a>' + bookBtn('primary') + '</div>' +
           (ratings ? '<div class="ns-rates">' + ratings + '</div>' : '') + '</div>' +
-          '<a class="ns-scroll" href="#ns-' + ((enabledSections()[1] || {}).id || 'rooms') + '" aria-label="Scroll down">' + ic('down') + '</a></div>';
+          '<a class="ns-scroll" href="#ns-' + ((enabledSections()[1] || {}).id || 'rooms') + '" aria-label="' + e(T('Scroll down')) + '">' + ic('down') + '</a></div>';
       },
 
       personas: function () {
         var list = NS.enabledPersonas(data), cur = S.persona;
         var title = NS.get(data, 'personas.title', '') || 'Who is coming?';
-        return head('personas', 'Made for you', title, '<p>' + e(NS.get(data, 'personas.lead', '') || 'Pick the traveller you are. The whole page rearranges itself: rooms, places, and a stay planned hour by hour.') + '</p>') +
-          '<div class="ns-pers" role="listbox" aria-label="Choose your kind of trip">' +
-          '<button class="ns-per all' + (cur ? '' : ' on') + '" data-persona="" role="option" aria-selected="' + !cur + '"><span class="ns-per-ic">' + ic('sparkle') + '</span><b>Everyone</b><small>Show me everything</small></button>' +
+        return head('personas', 'Made for you', title, '<p>' + e(TR(NS.get(data, 'personas.lead', '')) || T('Pick the traveller you are. The whole page rearranges itself: rooms, places, and a stay planned hour by hour.')) + '</p>') +
+          '<div class="ns-pers" role="listbox" aria-label="' + e(T('Choose your kind of trip')) + '">' +
+          '<button class="ns-per all' + (cur ? '' : ' on') + '" data-persona="" role="option" aria-selected="' + !cur + '"><span class="ns-per-ic">' + ic('sparkle') + '</span><b>' + e(T('Everyone')) + '</b><small>' + e(T('Show me everything')) + '</small></button>' +
           list.map(function (p) {
             var on = cur === p.id;
-            return '<button class="ns-per' + (on ? ' on' : '') + '" data-persona="' + p.id + '" role="option" aria-selected="' + on + '"><span class="ns-per-ic">' + ic(p.icon) + '</span><b>' + e(p.name) + '</b><small>' + e(p.line) + '</small></button>';
+            return '<button class="ns-per' + (on ? ' on' : '') + '" data-persona="' + p.id + '" role="option" aria-selected="' + on + '"><span class="ns-per-ic">' + ic(p.icon) + '</span><b>' + e(T(p.name)) + '</b><small>' + e(T(p.line)) + '</small></button>';
           }).join('') + '</div>' +
-          (cur ? '<p class="ns-per-now">' + ic('check') + 'Showing the site for <b>' + e(persona().name) + '</b>. <a href="#ns-stay">See your stay</a> · <button data-persona="">Show everything</button></p>' : '');
+          (cur ? '<p class="ns-per-now">' + ic('check') + TH('Showing the site for {who}.', { who: '<b>' + e(T(persona().name)) + '</b>' }) + ' <a href="#ns-stay">' + e(T('See your stay')) + '</a> · <button data-persona="">' + e(T('Show everything')) + '</button></p>' : '');
       },
 
       story: function () {
         var st = data.story || {};
-        var img = st.image ? '<figure class="ns-arch"><img src="' + e(mediaSrc(st.image)) + '" alt="' + e(st.image_alt || '') + '" loading="lazy">' + (st.caption ? '<figcaption>' + e(st.caption) + '</figcaption>' : '') + '</figure>' : '<div class="ns-arch art">' + NS.orn.lily() + '</div>';
-        return '<div class="ns-story">' + img + '<div class="ns-story-text"><div class="ns-eyebrow">' + e(st.eyebrow || 'Our story') + '</div><h2>' + e(sectionTitle('story', st.title || 'Welcome')) + '</h2>' +
-          '<div class="ns-prose">' + NS.rich(st.body || NS.draft.story(data)) + '</div>' + (st.sign ? '<p class="ns-sign">' + e(st.sign) + '</p>' : '') + '</div></div>';
+        var img = st.image ? '<figure class="ns-arch"><img src="' + e(mediaSrc(st.image)) + '" alt="' + e(TR(st.image_alt || '')) + '" loading="lazy">' + (st.caption ? '<figcaption>' + e(TR(st.caption)) + '</figcaption>' : '') + '</figure>' : '<div class="ns-arch art">' + NS.orn.lily() + '</div>';
+        return '<div class="ns-story">' + img + '<div class="ns-story-text"><div class="ns-eyebrow">' + e(TR(st.eyebrow || 'Our story')) + '</div><h2>' + e(sectionTitle('story', st.title || 'Welcome')) + '</h2>' +
+          '<div class="ns-prose">' + NS.rich(TR(st.body) || NS.draft.story(data)) + '</div>' + (st.sign ? '<p class="ns-sign">' + e(st.sign) + '</p>' : '') + '</div></div>';
       },
 
       highlights: function () {
@@ -843,7 +1448,7 @@
           (p.perks || []).slice().reverse().forEach(function (k) {
             if (k === 'location' || feats.indexOf(k) < 0) return;
             var f = NS.FEATURES[k];
-            items = items.filter(function (x) { return x.title !== f.label; });
+            items = items.filter(function (x) { return x.title !== f.label && x.title !== T(f.label); });
             items.unshift({ icon: f.icon, title: f.label, text: '', forYou: true });
           });
         }
@@ -852,7 +1457,7 @@
             return '<div class="ns-num">' + ic(n.icon) + '<b>' + e(n.n) + (n.unit ? '<small>' + e(n.unit) + '</small>' : '') + '</b><span>' + e(n.label) + '</span></div>';
           }).join('') + '</div>' : '') +
           '<div class="ns-hls">' + items.slice(0, 8).map(function (h) {
-            return '<div class="ns-hl' + (h.forYou ? ' you' : '') + '"><span class="ns-hl-ic">' + ic(h.icon || 'star') + '</span><div><h3>' + e(h.title) + (h.forYou ? ' <em>for you</em>' : '') + '</h3>' + (h.text ? '<p>' + e(h.text) + '</p>' : '') + '</div></div>';
+            return '<div class="ns-hl' + (h.forYou ? ' you' : '') + '"><span class="ns-hl-ic">' + ic(h.icon || 'star') + '</span><div><h3>' + e(TR(h.title)) + (h.forYou ? ' <em>' + e(T('for you')) + '</em>' : '') + '</h3>' + (h.text ? '<p>' + e(TR(h.text)) + '</p>' : '') + '</div></div>';
           }).join('') + '</div>';
       },
 
@@ -860,27 +1465,27 @@
         var p = persona(), picks = p ? NS.roomsFor(data, p) : [];
         var rooms = (data.rooms || []).filter(function (r) { return r && r.name; });
         if (p) rooms = rooms.slice().sort(function (a, b) { return (picks.indexOf(a.id) < 0) - (picks.indexOf(b.id) < 0); });
-        if (!rooms.length) return head('rooms', 'Sleep well', 'Rooms', '') + '<p class="ns-empty">Rooms are coming soon.</p>';
-        return head('rooms', 'Sleep well', 'Rooms', data.rooms_intro ? NS.rich(data.rooms_intro) : '') +
+        if (!rooms.length) return head('rooms', 'Sleep well', 'Rooms', '') + '<p class="ns-empty">' + e(T('Rooms are coming soon.')) + '</p>';
+        return head('rooms', 'Sleep well', 'Rooms', data.rooms_intro ? NS.rich(TR(data.rooms_intro)) : '') +
           '<div class="ns-rooms">' + rooms.map(function (r, i) {
             var photos = (r.photos || []).filter(Boolean);
             var media = photos.length ? '<div class="ns-carousel" data-carousel>' + photos.map(function (ph, k) {
-              return '<img src="' + e(mediaSrc(ph)) + '" alt="' + e(r.name) + ' photo ' + (k + 1) + '" loading="lazy" data-lb="room-' + i + '" data-lb-i="' + k + '">';
-            }).join('') + '</div>' + (photos.length > 1 ? '<div class="ns-car-nav"><button data-car="-1" aria-label="Previous photo">' + ic('left') + '</button><span>1 / ' + photos.length + '</span><button data-car="1" aria-label="Next photo">' + ic('right') + '</button></div>' : '')
-              : roomArt(r, i) + '<span class="ns-soon">Photos coming soon</span>';
+              return '<img src="' + e(mediaSrc(ph)) + '" alt="' + e(T('{room} photo {n}', { room: TR(r.name), n: k + 1 })) + '" loading="lazy" data-lb="room-' + i + '" data-lb-i="' + k + '">';
+            }).join('') + '</div>' + (photos.length > 1 ? '<div class="ns-car-nav"><button data-car="-1" aria-label="' + e(T('Previous photo')) + '">' + ic('left') + '</button><span>1 / ' + photos.length + '</span><button data-car="1" aria-label="' + e(T('Next photo')) + '">' + ic('right') + '</button></div>' : '')
+              : roomArt(r, i) + '<span class="ns-soon">' + e(T('Photos coming soon')) + '</span>';
             var fits = picks.indexOf(r.id) >= 0;
-            var specs = [r.size ? ic('ruler') + e(r.size) + ' m²' : '', r.beds ? ic('bed') + e(r.beds) : '', r.guests ? ic('users') + 'Up to ' + e(r.guests) : ''].filter(Boolean);
+            var specs = [r.size ? ic('ruler') + e(r.size) + ' m²' : '', r.beds ? ic('bed') + e(TR(r.beds)) : '', r.guests ? ic('users') + e(T('Up to {n}', { n: r.guests })) : ''].filter(Boolean);
             var tools = [
-              photos.length ? '<button class="ns-chip" data-room-photos="' + i + '">' + ic('grid') + photos.length + ' photos</button>' : '',
+              photos.length ? '<button class="ns-chip" data-room-photos="' + i + '">' + ic('grid') + e(T('{n} photos', { n: photos.length })) + '</button>' : '',
               r.pano ? '<button class="ns-chip" data-room-pano="' + i + '">' + ic('cube') + '360°</button>' : '',
-              r.tour ? '<button class="ns-chip" data-room-tour="' + i + '">' + ic('cube') + '3D tour</button>' : '',
-              r.video ? '<button class="ns-chip" data-room-video="' + i + '">' + ic('play') + 'Video</button>' : ''].join('');
-            return '<article class="ns-room' + (fits ? ' fits' : '') + '"><div class="ns-room-media">' + media + (fits ? '<span class="ns-fit">' + ic('heart') + 'Perfect for you</span>' : '') + '</div>' +
-              '<div class="ns-room-body"><h3>' + e(r.name) + '</h3>' + (specs.length ? '<div class="ns-specs">' + specs.map(function (s) { return '<span>' + s + '</span>'; }).join('') + '</div>' : '') +
-              (r.text ? '<div class="ns-room-text">' + NS.rich(r.text) + '</div>' : '') +
-              ((r.features || []).length ? '<ul class="ns-feats">' + r.features.slice(0, 6).map(function (f) { return '<li>' + ic('check') + e(f) + '</li>'; }).join('') + '</ul>' : '') +
+              r.tour ? '<button class="ns-chip" data-room-tour="' + i + '">' + ic('cube') + e(T('3D tour')) + '</button>' : '',
+              r.video ? '<button class="ns-chip" data-room-video="' + i + '">' + ic('play') + e(T('Video')) + '</button>' : ''].join('');
+            return '<article class="ns-room' + (fits ? ' fits' : '') + '"><div class="ns-room-media">' + media + (fits ? '<span class="ns-fit">' + ic('heart') + e(T('Perfect for you')) + '</span>' : '') + '</div>' +
+              '<div class="ns-room-body"><h3>' + e(TR(r.name)) + '</h3>' + (specs.length ? '<div class="ns-specs">' + specs.map(function (s) { return '<span>' + s + '</span>'; }).join('') + '</div>' : '') +
+              (r.text ? '<div class="ns-room-text">' + NS.rich(TR(r.text)) + '</div>' : '') +
+              ((r.features || []).length ? '<ul class="ns-feats">' + r.features.slice(0, 6).map(function (f) { return '<li>' + ic('check') + e(TR(f)) + '</li>'; }).join('') + '</ul>' : '') +
               (tools ? '<div class="ns-room-tools">' + tools + '</div>' : '') +
-              '<div class="ns-room-foot">' + (r.price ? '<span class="ns-price">from <b>' + e(r.price) + '</b> / night</span>' : '<span></span>') + bookBtn('sm', 'Check dates') + '</div></div></article>';
+              '<div class="ns-room-foot">' + (r.price ? '<span class="ns-price">' + TH('from {price} / night', { price: '<b>' + e(r.price) + '</b>' }) + '</span>' : '<span></span>') + bookBtn('sm', 'Check dates') + '</div></div></article>';
           }).join('') + '</div>';
       },
 
@@ -889,19 +1494,19 @@
         if (!items.length) return '';
         var cur = Math.min(S.wt || 0, items.length - 1), it = items[cur];
         var tabs = items.length > 1 ? '<div class="ns-tabs">' + items.map(function (x, k) {
-          return '<button class="' + (k === cur ? 'on' : '') + '" data-wt="' + k + '">' + ic(x.kind === 'pano' ? 'cube' : x.kind === 'embed' ? 'cube' : 'walk') + e(x.title || 'Tour ' + (k + 1)) + '</button>';
+          return '<button class="' + (k === cur ? 'on' : '') + '" data-wt="' + k + '">' + ic(x.kind === 'pano' ? 'cube' : x.kind === 'embed' ? 'cube' : 'walk') + e(TR(x.title) || T('Tour {n}', { n: k + 1 })) + '</button>';
         }).join('') + '</div>' : '';
         var body;
-        if (it.kind === 'pano') body = '<div class="ns-pano" data-pano="' + e(mediaSrc(it.src)) + '"><div class="ns-pano-hint">' + ic('compass') + 'Drag to look around</div><button class="ns-pano-fs" data-fs aria-label="Full screen">' + ic('expand') + '</button></div>';
-        else if (it.kind === 'embed') body = '<div class="ns-embed"><iframe src="' + e(NS.videoInfo(it.embed).embed || it.embed) + '" allow="fullscreen; xr-spatial-tracking; autoplay" allowfullscreen loading="lazy" title="' + e(it.title || 'Virtual tour') + '"></iframe></div>';
+        if (it.kind === 'pano') body = '<div class="ns-pano" data-pano="' + e(mediaSrc(it.src)) + '"><div class="ns-pano-hint">' + ic('compass') + e(T('Drag to look around')) + '</div><button class="ns-pano-fs" data-fs aria-label="' + e(T('Full screen')) + '">' + ic('expand') + '</button></div>';
+        else if (it.kind === 'embed') body = '<div class="ns-embed"><iframe src="' + e(NS.videoInfo(it.embed).embed || it.embed) + '" allow="fullscreen; xr-spatial-tracking; autoplay" allowfullscreen loading="lazy" title="' + e(TR(it.title) || T('Virtual tour')) + '"></iframe></div>';
         else {
           var stops = it.stops || [], k = Math.min(S.stop || 0, stops.length - 1), st = stops[k] || {};
-          body = '<div class="ns-walk"><figure><img src="' + e(mediaSrc(st.src)) + '" alt="' + e(st.caption || '') + '"><figcaption><b>' + (k + 1) + ' / ' + stops.length + '</b> ' + e(st.caption || '') + '</figcaption></figure>' +
-            '<div class="ns-walk-nav"><button class="ns-btn sm" data-stop="-1"' + (k === 0 ? ' disabled' : '') + '>' + ic('left') + 'Back</button><div class="ns-walk-dots">' + stops.map(function (_, j) { return '<i class="' + (j === k ? 'on' : '') + '"></i>'; }).join('') + '</div>' +
-            '<button class="ns-btn sm primary" data-stop="1"' + (k >= stops.length - 1 ? ' disabled' : '') + '>Walk on' + ic('right') + '</button></div></div>';
+          body = '<div class="ns-walk"><figure><img src="' + e(mediaSrc(st.src)) + '" alt="' + e(TR(st.caption || '')) + '"><figcaption><b>' + (k + 1) + ' / ' + stops.length + '</b> ' + e(TR(st.caption || '')) + '</figcaption></figure>' +
+            '<div class="ns-walk-nav"><button class="ns-btn sm" data-stop="-1"' + (k === 0 ? ' disabled' : '') + '>' + ic('left') + e(T('Back')) + '</button><div class="ns-walk-dots">' + stops.map(function (_, j) { return '<i class="' + (j === k ? 'on' : '') + '"></i>'; }).join('') + '</div>' +
+            '<button class="ns-btn sm primary" data-stop="1"' + (k >= stops.length - 1 ? ' disabled' : '') + '>' + e(T('Walk on')) + ic('right') + '</button></div></div>';
         }
-        return head('walkthrough', 'Look around', wt.title || 'Step inside', wt.lead ? '<p>' + e(wt.lead) + '</p>' : '') + tabs +
-          '<div class="ns-wt">' + body + (it.text || it.credit ? '<p class="ns-wt-note">' + e(it.text || '') + (it.credit ? ' <small>' + e(it.credit) + '</small>' : '') + '</p>' : '') + '</div>';
+        return head('walkthrough', 'Look around', wt.title || 'Step inside', wt.lead ? '<p>' + e(TR(wt.lead)) + '</p>' : '') + tabs +
+          '<div class="ns-wt">' + body + (it.text || it.credit ? '<p class="ns-wt-note">' + e(TR(it.text || '')) + (it.credit ? ' <small>' + e(it.credit) + '</small>' : '') + '</p>' : '') + '</div>';
       },
 
       gallery: function () {
@@ -910,7 +1515,7 @@
         var layout = g.layout || 'bento';
         return head('gallery', 'Gallery', g.title || 'A closer look', '') +
           '<div class="ns-gal ' + e(layout) + '">' + items.map(function (it, i) {
-            return '<figure class="g' + (i % 7) + '"><img src="' + e(mediaSrc(it.src)) + '" alt="' + e(it.caption || '') + '" loading="lazy" data-lb="gal" data-lb-i="' + i + '">' + (it.caption ? '<figcaption>' + e(it.caption) + '</figcaption>' : '') + '</figure>';
+            return '<figure class="g' + (i % 7) + '"><img src="' + e(mediaSrc(it.src)) + '" alt="' + e(TR(it.caption || '')) + '" loading="lazy" data-lb="gal" data-lb-i="' + i + '">' + (it.caption ? '<figcaption>' + e(TR(it.caption)) + '</figcaption>' : '') + '</figure>';
           }).join('') + '</div>';
       },
 
@@ -925,28 +1530,28 @@
         S.story = st;
         var d = st.days[day];
         var rooms = (data.rooms || []).filter(function (r) { return st.rooms.indexOf(r.id) >= 0; });
-        return head('stay', 'Your stay, planned', 'Your stay, hour by hour', '<p>Written for the way you travel, from the places around us. Change the trip and watch it rewrite itself.</p>') +
+        return head('stay', 'Your stay, planned', 'Your stay, hour by hour', '<p>' + e(T('Written for the way you travel, from the places around us. Change the trip and watch it rewrite itself.')) + '</p>') +
           '<div class="ns-stay-ctl">' +
-            '<label><span>Travelling as</span><select data-stay-persona>' + list.concat(list.some(function (x) { return x.id === pid; }) ? [] : [p]).map(function (x) {
-              return '<option value="' + x.id + '"' + (x.id === pid ? ' selected' : '') + '>' + e(x.name) + '</option>'; }).join('') + '</select></label>' +
-            '<label><span>Nights</span><div class="ns-seg">' + [1, 2, 3, 4].map(function (n) { return '<button data-nights="' + n + '" class="' + (n === st.nights ? 'on' : '') + '">' + n + '</button>'; }).join('') + '</div></label>' +
-            '<label><span>Season</span><select data-season>' + Object.keys(NS.SEASONS).map(function (k) { return '<option value="' + k + '"' + (k === st.season ? ' selected' : '') + '>' + NS.SEASONS[k] + '</option>'; }).join('') + '</select></label>' +
+            '<label><span>' + e(T('Travelling as')) + '</span><select data-stay-persona>' + list.concat(list.some(function (x) { return x.id === pid; }) ? [] : [p]).map(function (x) {
+              return '<option value="' + x.id + '"' + (x.id === pid ? ' selected' : '') + '>' + e(T(x.name)) + '</option>'; }).join('') + '</select></label>' +
+            '<label><span>' + e(T('Nights')) + '</span><div class="ns-seg">' + [1, 2, 3, 4].map(function (n) { return '<button data-nights="' + n + '" class="' + (n === st.nights ? 'on' : '') + '">' + n + '</button>'; }).join('') + '</div></label>' +
+            '<label><span>' + e(T('Season')) + '</span><select data-season>' + Object.keys(NS.SEASONS).map(function (k) { return '<option value="' + k + '"' + (k === st.season ? ' selected' : '') + '>' + e(T(NS.SEASONS[k])) + '</option>'; }).join('') + '</select></label>' +
           '</div>' +
-          '<div class="ns-stay-intro"><span class="ns-per-ic big">' + ic(p.icon) + '</span><div><h3>' + e(p.name) + '</h3><p>' + e(st.intro) + '</p>' +
+          '<div class="ns-stay-intro"><span class="ns-per-ic big">' + ic(p.icon) + '</span><div><h3>' + e(T(p.name)) + '</h3><p>' + e(st.intro) + '</p>' +
             '<div class="ns-tips">' + st.tips.map(function (t) { return '<span class="ns-tip' + (t.own ? ' own' : '') + '">' + ic(t.icon) + e(t.text) + '</span>'; }).join('') + '</div></div></div>' +
           '<div class="ns-days" role="tablist">' + st.days.map(function (x, k) {
-            return '<button role="tab" aria-selected="' + (k === day) + '" class="' + (k === day ? 'on' : '') + '" data-day="' + k + '"><small>' + (k === 0 ? 'Day 1' : 'Day ' + (k + 1)) + '</small>' + e(x.title) + '</button>';
+            return '<button role="tab" aria-selected="' + (k === day) + '" class="' + (k === day ? 'on' : '') + '" data-day="' + k + '"><small>' + e(T('Day {n}', { n: k + 1 })) + '</small>' + e(x.title) + '</button>';
           }).join('') + '</div>' +
           '<ol class="ns-tl">' + d.slots.map(function (s, k) {
             var pl = s.place;
             return '<li class="' + (s.hotel ? 'home' : '') + '"><time>' + e(s.time) + '</time><span class="ns-tl-dot" style="' + (s.cat ? '--pin:' + NS.CATS[s.cat].color : '') + '">' + ic(s.icon || 'pin') + '</span>' +
               '<div class="ns-tl-body"><h4>' + e(s.title) + '</h4><p>' + e(s.text) + '</p>' +
-              (pl ? '<div class="ns-tl-meta"><span>' + ic('walk') + e(NS.fmtWalk(s.walk)) + '</span><button data-show-place="' + e(pl.id || '') + '">' + ic('map') + 'Show on map</button>' +
-                '<a href="' + e(NS.mapsLink(pl, NS.get(data, 'hotel.city', ''))) + '" target="_blank" rel="noopener">' + ic('external') + 'Google Maps</a></div>' : '') + '</div>' +
+              (pl ? '<div class="ns-tl-meta"><span>' + ic('walk') + e(NS.fmtWalk(s.walk)) + '</span><button data-show-place="' + e(pl.id || '') + '">' + ic('map') + e(T('Show on map')) + '</button>' +
+                '<a href="' + e(NS.mapsLink(pl, NS.get(data, 'hotel.city', ''))) + '" target="_blank" rel="noopener">' + ic('external') + e(T('Google Maps')) + '</a></div>' : '') + '</div>' +
               (pl && pl.thumb ? '<img class="ns-tl-img" src="' + e(pl.thumb) + '" alt="" loading="lazy">' : '') + '</li>';
           }).join('') + '</ol>' +
-          '<div class="ns-stay-foot">' + (d.route && d.route.length > 1 && has('neighborhood') ? '<button class="ns-btn" data-fly="' + day + '">' + ic('route') + 'Walk this day on the map</button>' : '') +
-            (rooms.length ? '<span class="ns-stay-room">' + ic('bed') + 'Our pick for you: <b>' + e(rooms[0].name) + '</b></span>' : '') + bookBtn('primary', 'Book this stay') + '</div>';
+          '<div class="ns-stay-foot">' + (d.route && d.route.length > 1 && has('neighborhood') ? '<button class="ns-btn" data-fly="' + day + '">' + ic('route') + e(T('Walk this day on the map')) + '</button>' : '') +
+            (rooms.length ? '<span class="ns-stay-room">' + ic('bed') + TH('Our pick for you: {room}', { room: '<b>' + e(TR(rooms[0].name)) + '</b>' }) + '</span>' : '') + bookBtn('primary', 'Book this stay') + '</div>';
       },
 
       neighborhood: function () {
@@ -958,18 +1563,18 @@
         var groups = (S.filter.length ? S.filter : cats).map(function (c) {
           var xs = shown.filter(function (x) { return x.cat === c; }).sort(function (a, b) { return (b.pinned ? 2 : 0) + (b.wiki ? 1 : 0) - (a.pinned ? 2 : 0) - (a.wiki ? 1 : 0) || a.walk - b.walk; }).slice(0, 6);
           if (!xs.length) return '';
-          return '<div class="ns-pg"><h4 style="--pin:' + NS.CATS[c].color + '">' + ic(NS.CATS[c].icon) + e(NS.CATS[c].plural.charAt(0).toUpperCase() + NS.CATS[c].plural.slice(1)) + '<small>' + places.filter(function (x) { return x.cat === c; }).length + '</small></h4><ul>' +
-            xs.map(function (x) { return '<li><button data-show-place="' + e(x.id || '') + '"><b>' + e(x.name) + '</b>' + (x.note ? '<em>' + ic('sparkle') + e(x.note) + '</em>' : '') + '</button><span>' + x.walk + ' min</span></li>'; }).join('') + '</ul></div>';
+          return '<div class="ns-pg"><h4 style="--pin:' + NS.CATS[c].color + '">' + ic(NS.CATS[c].icon) + e(T(NS.CATS[c].plural).charAt(0).toUpperCase() + T(NS.CATS[c].plural).slice(1)) + '<small>' + places.filter(function (x) { return x.cat === c; }).length + '</small></h4><ul>' +
+            xs.map(function (x) { return '<li><button data-show-place="' + e(x.id || '') + '"><b>' + e(x.name) + '</b>' + (x.note ? '<em>' + ic('sparkle') + e(TR(x.note)) + '</em>' : '') + '</button><span>' + e(T('{n} min', { n: x.walk })) + '</span></li>'; }).join('') + '</ul></div>';
         }).join('');
-        return head('neighborhood', NS.get(data, 'hotel.area', '') || 'The neighbourhood', n.title || 'Everything is a short walk away', '<p>' + e(n.intro || NS.draft.neighborhood(data)) + '</p>') +
+        return head('neighborhood', NS.get(data, 'hotel.area', '') || 'The neighbourhood', n.title || 'Everything is a short walk away', '<p>' + e(TR(n.intro) || NS.draft.neighborhood(data)) + '</p>') +
           '<div class="ns-hood">' +
-          '<div class="ns-map-wrap"><div class="ns-map-slot"></div><div class="ns-map-legend"><span>' + ic('compass') + 'Drag to turn · tap a pin for details</span></div></div>' +
-          '<div class="ns-hood-side"><div class="ns-filters">' + '<button class="' + (S.filter.length ? '' : 'on') + '" data-cat="">All</button>' + cats.map(function (c) {
-            return '<button class="' + (S.filter.indexOf(c) >= 0 ? 'on' : '') + '" data-cat="' + c + '" style="--pin:' + NS.CATS[c].color + '"><i></i>' + e(NS.CATS[c].label) + '</button>';
-          }).join('') + '</div><div class="ns-pgs">' + (groups || '<p class="ns-empty">No places in this filter yet.</p>') + '</div></div></div>' +
+          '<div class="ns-map-wrap"><div class="ns-map-slot"></div><div class="ns-map-legend"><span>' + ic('compass') + e(T('Drag to turn · tap a pin for details')) + '</span></div></div>' +
+          '<div class="ns-hood-side"><div class="ns-filters">' + '<button class="' + (S.filter.length ? '' : 'on') + '" data-cat="">' + e(T('All')) + '</button>' + cats.map(function (c) {
+            return '<button class="' + (S.filter.indexOf(c) >= 0 ? 'on' : '') + '" data-cat="' + c + '" style="--pin:' + NS.CATS[c].color + '"><i></i>' + e(T(NS.CATS[c].label)) + '</button>';
+          }).join('') + '</div><div class="ns-pgs">' + (groups || '<p class="ns-empty">' + e(T('No places in this filter yet.')) + '</p>') + '</div></div></div>' +
           (landmarks.length ? '<div class="ns-lms">' + landmarks.map(function (x) {
-            return '<article class="ns-lm"><img src="' + e(x.wiki.thumb) + '" alt="" loading="lazy"><div><span class="ns-lm-walk">' + ic('walk') + x.walk + ' min</span><h4>' + e(x.name) + '</h4><p>' + e(NS.firstSentence(x.wiki.extract, 150)) + '</p>' +
-              (x.wiki.url ? '<a href="' + e(x.wiki.url) + '" target="_blank" rel="noopener">Read more</a>' : '') + '</div></article>';
+            return '<article class="ns-lm"><img src="' + e(x.wiki.thumb) + '" alt="" loading="lazy"><div><span class="ns-lm-walk">' + ic('walk') + e(T('{n} min', { n: x.walk })) + '</span><h4>' + e(x.name) + '</h4><p>' + e(NS.firstSentence(x.wiki.extract, 150)) + '</p>' +
+              (x.wiki.url ? '<a href="' + e(x.wiki.url) + '" target="_blank" rel="noopener">' + e(T('Read more')) + '</a>' : '') + '</div></article>';
           }).join('') + '</div>' : '') +
           (n.credit ? '<p class="ns-small">' + e(n.credit) + '</p>' : '');
       },
@@ -980,21 +1585,21 @@
         var cur = Math.min(S.vid || 0, vids.length - 1), v = vids[cur], vi = NS.videoInfo(mediaSrc(v.src));
         var player = vi.type === 'file'
           ? '<video src="' + e(vi.src) + (v.start ? '#t=' + (+v.start) : '') + '" controls playsinline preload="metadata"' + (v.poster ? ' poster="' + e(mediaSrc(v.poster)) + '"' : '') + '></video>'
-          : '<iframe src="' + e(vi.embed) + '" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen loading="lazy" title="' + e(v.title || 'Video') + '"></iframe>';
+          : '<iframe src="' + e(vi.embed) + '" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen loading="lazy" title="' + e(TR(v.title) || T('Video')) + '"></iframe>';
         return head('film', 'Watch', 'See it for yourself', '') +
-          '<div class="ns-film-main"><div class="ns-embed">' + player + '</div>' + (v.title || v.text ? '<div class="ns-film-cap"><h3>' + e(v.title || '') + '</h3><p>' + e(v.text || '') + (v.credit ? ' <small>' + e(v.credit) + '</small>' : '') + '</p></div>' : '') + '</div>' +
-          (vids.length > 1 ? '<div class="ns-tabs">' + vids.map(function (x, k) { return '<button class="' + (k === cur ? 'on' : '') + '" data-vid="' + k + '">' + ic('play') + e(x.title || 'Video ' + (k + 1)) + '</button>'; }).join('') + '</div>' : '');
+          '<div class="ns-film-main"><div class="ns-embed">' + player + '</div>' + (v.title || v.text ? '<div class="ns-film-cap"><h3>' + e(TR(v.title || '')) + '</h3><p>' + e(TR(v.text || '')) + (v.credit ? ' <small>' + e(v.credit) + '</small>' : '') + '</p></div>' : '') + '</div>' +
+          (vids.length > 1 ? '<div class="ns-tabs">' + vids.map(function (x, k) { return '<button class="' + (k === cur ? 'on' : '') + '" data-vid="' + k + '">' + ic('play') + e(TR(x.title) || T('Video {n}', { n: k + 1 })) + '</button>'; }).join('') + '</div>' : '');
       },
 
       dining: function () {
         var d = data.dining || {};
         if (!d.name && !d.body) return '';
         var photos = (d.photos || []).filter(Boolean).slice(0, 3);
-        return '<div class="ns-dine"><div class="ns-dine-text"><div class="ns-eyebrow">' + e(d.eyebrow || 'Eat & drink') + '</div><h2>' + e(sectionTitle('dining', d.title || d.name)) + '</h2>' +
-          '<div class="ns-prose">' + NS.rich(d.body || '') + '</div>' +
-          ((d.facts || []).length ? '<ul class="ns-facts">' + d.facts.map(function (f) { return '<li>' + ic(f.icon || 'clock') + '<span>' + e(f.text) + '</span></li>'; }).join('') + '</ul>' : '') +
-          '<div class="ns-row">' + (d.link ? '<a class="ns-btn primary" href="' + e(d.link) + '" target="_blank" rel="noopener">' + e(d.link_label || 'See the menu') + ic('arrow') + '</a>' : '') +
-          (d.phone ? '<a class="ns-btn" href="tel:' + e(String(d.phone).replace(/\s+/g, '')) + '">' + ic('phone') + 'Reserve a table</a>' : '') + '</div></div>' +
+        return '<div class="ns-dine"><div class="ns-dine-text"><div class="ns-eyebrow">' + e(TR(d.eyebrow || 'Eat & drink')) + '</div><h2>' + e(sectionTitle('dining', d.title || d.name)) + '</h2>' +
+          '<div class="ns-prose">' + NS.rich(TR(d.body || '')) + '</div>' +
+          ((d.facts || []).length ? '<ul class="ns-facts">' + d.facts.map(function (f) { return '<li>' + ic(f.icon || 'clock') + '<span>' + e(TR(f.text)) + '</span></li>'; }).join('') + '</ul>' : '') +
+          '<div class="ns-row">' + (d.link ? '<a class="ns-btn primary" href="' + e(d.link) + '" target="_blank" rel="noopener">' + e(TR(d.link_label || 'See the menu')) + ic('arrow') + '</a>' : '') +
+          (d.phone ? '<a class="ns-btn" href="tel:' + e(String(d.phone).replace(/\s+/g, '')) + '">' + ic('phone') + e(T('Reserve a table')) + '</a>' : '') + '</div></div>' +
           '<div class="ns-dine-pics n' + photos.length + '">' + photos.map(function (ph, k) { return '<img src="' + e(mediaSrc(ph)) + '" alt="" loading="lazy" data-lb="dine" data-lb-i="' + k + '">'; }).join('') + '</div></div>';
       },
 
@@ -1003,10 +1608,10 @@
         if (!ratings.length && !reviews.length) return '';
         return head('reviews', 'Guests say', 'Loved by our guests', '') +
           (ratings.length ? '<div class="ns-scores">' + ratings.map(function (r) {
-            return '<a class="ns-score"' + (r.url ? ' href="' + e(r.url) + '" target="_blank" rel="noopener"' : '') + '><b>' + e(r.score) + '<small>/' + e(r.out_of || 10) + '</small></b><span>' + e(r.source) + '</span>' + (r.count ? '<em>' + e(r.count) + ' reviews</em>' : '') + '</a>';
+            return '<a class="ns-score"' + (r.url ? ' href="' + e(r.url) + '" target="_blank" rel="noopener"' : '') + '><b>' + e(r.score) + '<small>/' + e(r.out_of || 10) + '</small></b><span>' + e(r.source) + '</span>' + (r.count ? '<em>' + e(T('{n} reviews', { n: r.count })) + '</em>' : '') + '</a>';
           }).join('') + '</div>' : '') +
           (reviews.length ? '<div class="ns-quotes">' + reviews.map(function (r) {
-            return '<blockquote class="ns-quote">' + ic('quote') + '<p>' + e(r.quote) + '</p><footer><b>' + e(r.author || 'A guest') + '</b>' + (r.source ? ' · ' + e(r.source) : '') + (r.date ? ' · ' + e(r.date) : '') + '</footer></blockquote>';
+            return '<blockquote class="ns-quote">' + ic('quote') + '<p>' + e(r.quote) + '</p><footer><b>' + e(r.author || T('A guest')) + '</b>' + (r.source ? ' · ' + e(r.source) : '') + (r.date ? ' · ' + e(r.date) : '') + '</footer></blockquote>';
           }).join('') + '</div>' : '');
       },
 
@@ -1017,26 +1622,27 @@
           var meta = NS.CHANNELS[c.kind] || NS.CHANNELS.other, url = c.url;
           if (c.kind === 'phone' && !url && h.phone) url = 'tel:' + String(h.phone).replace(/\s+/g, '');
           if (c.kind === 'email' && !url && h.email) url = 'mailto:' + h.email;
-          return '<a class="ns-btn' + (i === 0 ? ' primary' : '') + '" href="' + e(url || '#') + '" target="_blank" rel="noopener">' + ic(meta.icon) + e(c.label || meta.label) + '</a>';
+          return '<a class="ns-btn' + (i === 0 ? ' primary' : '') + '" href="' + e(url || '#') + '" target="_blank" rel="noopener">' + ic(meta.icon) + e(c.label ? TR(c.label) : T(meta.label)) + '</a>';
         }).join('');
-        var methods = (pay.methods || []).map(function (m) { return '<span class="ns-paym">' + ic(m === 'cash' ? 'euro' : 'card') + e(NS.PAYMENTS[m] || m) + '</span>'; }).join('');
+        var methods = (pay.methods || []).map(function (m) { return '<span class="ns-paym">' + ic(m === 'cash' ? 'euro' : 'card') + e(T(NS.PAYMENTS[m] || m)) + '</span>'; }).join('');
         var pol = (b.policies || []).filter(function (x) { return x && x.title; });
-        return head('booking', 'Book with confidence', 'How booking and payment work', b.intro ? '<p>' + e(b.intro) + '</p>' : '') +
+        return head('booking', 'Book with confidence', 'How booking and payment work', b.intro ? '<p>' + e(TR(b.intro)) + '</p>' : '') +
           '<ol class="ns-steps">' +
-            '<li><span class="ns-step-n">1</span><h3>' + ic('calendar') + 'Choose your dates</h3><p>' + e(b.step1 || 'Check prices and availability on the booking site you trust, or contact us directly.') + '</p><div class="ns-row wrap">' + chBtns + '</div></li>' +
-            '<li><span class="ns-step-n">2</span><h3>' + ic('card') + 'Pay the way you like</h3><p>' + e(pay.when || 'You pay when you book or at the hotel, depending on the rate you choose.') + '</p>' + (methods ? '<div class="ns-paylist">' + methods + '</div>' : '') +
-              (pay.note ? '<p class="ns-small">' + e(pay.note) + '</p>' : '') + '</li>' +
-            '<li><span class="ns-step-n">3</span><h3>' + ic('key') + 'Arrive and relax</h3><p>' + e(b.step3 || ('Check-in from ' + (h.checkin || '15:00') + ', check-out until ' + (h.checkout || '12:00') + '. We will have your room ready.')) + '</p></li>' +
+            '<li><span class="ns-step-n">1</span><h3>' + ic('calendar') + e(T('Choose your dates')) + '</h3><p>' + e(TR(b.step1) || T('Check prices and availability on the booking site you trust, or contact us directly.')) + '</p><div class="ns-row wrap">' + chBtns + '</div></li>' +
+            '<li><span class="ns-step-n">2</span><h3>' + ic('card') + e(T('Pay the way you like')) + '</h3><p>' + e(TR(pay.when) || T('You pay when you book or at the hotel, depending on the rate you choose.')) + '</p>' + (methods ? '<div class="ns-paylist">' + methods + '</div>' : '') +
+              (pay.note ? '<p class="ns-small">' + e(TR(pay.note)) + '</p>' : '') + '</li>' +
+            '<li><span class="ns-step-n">3</span><h3>' + ic('key') + e(T('Arrive and relax')) + '</h3><p>' + e(TR(b.step3) || T('Check-in from {in}, check-out until {out}. We will have your room ready.', { 'in': h.checkin || '15:00', out: h.checkout || '12:00' })) + '</p></li>' +
           '</ol>' +
-          (b.perk ? '<div class="ns-perk">' + ic('star') + '<p>' + e(b.perk) + '</p></div>' : '') +
-          (pol.length ? '<div class="ns-pols">' + pol.map(function (x) { return '<div class="ns-pol">' + ic(x.icon || 'info') + '<div><h4>' + e(x.title) + '</h4><p>' + e(x.text || '') + '</p></div></div>'; }).join('') + '</div>' : '');
+          (b.perk ? '<div class="ns-perk">' + ic('star') + '<p>' + e(TR(b.perk)) + '</p></div>' : '') +
+          (pol.length ? '<div class="ns-pols">' + pol.map(function (x) { return '<div class="ns-pol">' + ic(x.icon || 'info') + '<div><h4>' + e(TR(x.title)) + '</h4><p>' + e(TR(x.text || '')) + '</p></div></div>'; }).join('') + '</div>' : '');
       },
 
       faq: function () {
         var list = (data.faq && data.faq.length ? data.faq : NS.draft.faq(data)).filter(function (f) { return f && f.q; });
         if (!list.length) return '';
         return head('faq', 'Good to know', 'Questions guests ask', '') +
-          '<div class="ns-faq">' + list.map(function (f) { return '<details><summary>' + e(f.q) + ic('down') + '</summary><div class="ns-prose">' + NS.rich(f.a || '') + '</div></details>'; }).join('') + '</div>';
+          '<div class="ns-faq">' + list.map(function (f) { return '<details><summary>' + e(TR(f.q)) + ic('down') + '</summary><div class="ns-prose">' + NS.rich(TR(f.a || '')) + '</div></details>'; }).join('') + '</div>' +
+          (askOn() && has('contact') ? '<p class="ns-faq-ask">' + ic('chat') + e(T("Didn't find your answer?")) + ' <a href="#ns-ask">' + e(T('Ask us')) + '</a></p>' : '');
       },
 
       contact: function () {
@@ -1049,33 +1655,56 @@
         var ways = (c.directions || []).filter(function (x) { return x && x.title; });
         return head('contact', 'Find us', 'Getting here', '') +
           '<div class="ns-contact"><div class="ns-card"><h3>' + e(h.name || '') + '</h3><ul class="ns-lines">' + lines + '</ul>' +
-          (h.lat != null ? '<a class="ns-btn primary" href="' + e(NS.directions(h.lat, h.lng)) + '" target="_blank" rel="noopener">' + ic('route') + 'Directions</a>' : '') +
+          (h.lat != null ? '<a class="ns-btn primary" href="' + e(NS.directions(h.lat, h.lng)) + '" target="_blank" rel="noopener">' + ic('route') + e(T('Directions')) + '</a>' : '') +
           ((c.social || []).length ? '<div class="ns-social">' + c.social.map(function (s) { return '<a href="' + e(s.url) + '" target="_blank" rel="noopener">' + e(s.label) + '</a>'; }).join('') + '</div>' : '') + '</div>' +
-          (ways.length ? '<div class="ns-ways">' + ways.map(function (w) { return '<div class="ns-way">' + ic(w.icon || 'route') + '<div><h4>' + e(w.title) + '</h4><p>' + e(w.text || '') + '</p></div></div>'; }).join('') + '</div>' : '') + '</div>';
+          (ways.length ? '<div class="ns-ways">' + ways.map(function (w) { return '<div class="ns-way">' + ic(w.icon || 'route') + '<div><h4>' + e(TR(w.title)) + '</h4><p>' + e(TR(w.text || '')) + '</p></div></div>'; }).join('') + '</div>' : '') + '</div>' + askForm();
       }
     };
+    /* "Ask us a question": posts to opts.ask (GuestQuestions.py); the owner answers by email from their inbox. */
+    function askForm() {
+      if (!askOn()) return '';
+      var hn = NS.get(data, 'hotel.name', '') || T('the hotel');
+      return '<div class="ns-ask" id="ns-ask"><div class="ns-ask-head">' + ic('chat') + '<div><h3>' + e(T('Ask us a question')) + '</h3><p>' + e(T('We usually answer within a day, by email.')) + '</p></div></div>' +
+        '<form class="ns-ask-form" data-ask novalidate><div class="ns-ask-row">' +
+        '<label><span>' + e(T('Your name')) + '</span><input name="name" autocomplete="name" maxlength="80"></label>' +
+        '<label><span>' + e(T('Your email')) + '</span><input name="email" type="email" autocomplete="email" required maxlength="200"></label></div>' +
+        '<label><span>' + e(T('Your question')) + '</span><textarea name="message" rows="4" required maxlength="2000"></textarea></label>' +
+        '<label class="ns-hp" aria-hidden="true">Website <input name="website" tabindex="-1" autocomplete="off"></label>' +
+        '<p class="ns-ask-msg" role="status" aria-live="polite"></p>' +
+        '<div class="ns-ask-foot"><button class="ns-btn primary" type="submit">' + e(T('Send question')) + ic('arrow') + '</button>' +
+        '<small>' + e(T('Your message goes only to {hotel}, who use your email to reply.', { hotel: hn })) + '</small></div></form></div>';
+    }
+    function langSwitch(cls) {
+      var ls = NS.siteLangs(data);
+      if (ls.length < 2) return '';
+      return '<div class="ns-langs ' + (cls || '') + '" role="group" aria-label="' + e(T('Language')) + '">' + ls.map(function (c) {
+        return '<button type="button" data-lang="' + c + '" lang="' + c + '" class="' + (c === NS.lang ? 'on' : '') + '" aria-pressed="' + (c === NS.lang) + '" title="' + e(NS.LANGS[c].name) + '">' + NS.LANGS[c].short + '</button>';
+      }).join('') + '</div>';
+    }
     var PERSONA_SECTIONS = ['hero', 'personas', 'highlights', 'rooms', 'stay', 'neighborhood'];
     function has(id) { return enabledSections().some(function (s) { return s.id === id; }); }
 
     /* ---------------------------------------------------------------- frame: nav, footer, theme */
     function nav() {
       var h = data.hotel || {}, p = persona();
-      var links = [['rooms', 'Rooms'], ['stay', 'Your stay'], ['neighborhood', 'Neighbourhood'], ['booking', 'Booking']].filter(function (l) { return has(l[0]); });
+      var links = [['rooms', 'Rooms'], ['stay', 'Your stay'], ['neighborhood', 'Neighbourhood'], ['booking', 'Booking']].filter(function (l) { return has(l[0]); })
+        .map(function (l) { return [l[0], e(T(l[1]))]; });
       return '<nav class="ns-nav" aria-label="Site"><div class="ns-nav-in"><a class="ns-brand" href="#ns-top">' + NS.orn.monogram(h.name) + '<span>' + e(h.name || 'Hotel') + '</span></a>' +
         '<div class="ns-links">' + links.map(function (l) { return '<a href="#ns-' + l[0] + '">' + l[1] + '</a>'; }).join('') + '</div>' +
-        (p ? '<button class="ns-pill" data-persona="" title="Show everything">' + ic(p.icon) + '<span>' + e(p.name) + '</span>' + ic('x') + '</button>' : '') +
-        bookBtn('primary sm', 'Book') + '<button class="ns-burger" data-burger aria-label="Menu">' + ic('menu') + '</button></div>' +
+        langSwitch('wide') +
+        (p ? '<button class="ns-pill" data-persona="" title="' + e(T('Show everything')) + '">' + ic(p.icon) + '<span>' + e(T(p.name)) + '</span>' + ic('x') + '</button>' : '') +
+        bookBtn('primary sm', 'Book') + '<button class="ns-burger" data-burger aria-label="' + e(T('Menu')) + '">' + ic('menu') + '</button></div>' +
         '<div class="ns-sheet" data-sheet hidden>' + links.map(function (l) { return '<a href="#ns-' + l[0] + '">' + l[1] + '</a>'; }).join('') +
-        (has('personas') ? '<a href="#ns-personas">Who is coming?</a>' : '') + (has('contact') ? '<a href="#ns-contact">Contact</a>' : '') + '</div></nav>';
+        (has('personas') ? '<a href="#ns-personas">' + e(T('Who is coming?')) + '</a>' : '') + (has('contact') ? '<a href="#ns-contact">' + e(T('Contact')) + '</a>' : '') + langSwitch('in-sheet') + '</div></nav>';
     }
     function footer() {
       var h = data.hotel || {}, credits = (data.credits || []).filter(function (c) { return c && c.text; });
       var pl = opts.platform || { name: 'ArviStay' };
       return '<footer class="ns-foot">' + NS.orn.divider() + '<div class="ns-foot-in"><div>' + NS.orn.monogram(h.name) + '<b>' + e(h.name || '') + '</b><p>' + e([h.address, h.phone].filter(Boolean).join(' · ')) + '</p></div>' +
-        (credits.length ? '<details class="ns-credits"><summary>Photo and data credits</summary><ul>' + credits.map(function (c) {
+        (credits.length ? '<details class="ns-credits"><summary>' + e(T('Photo and data credits')) + '</summary><ul>' + credits.map(function (c) {
           return '<li>' + (c.url ? '<a href="' + e(c.url) + '" target="_blank" rel="noopener">' + e(c.text) + '</a>' : e(c.text)) + '</li>';
         }).join('') + '</ul></details>' : '') +
-        '<p class="ns-made">© ' + new Date().getFullYear() + ' ' + e(h.name || '') + ' · Website made with ' + (pl.url ? '<a href="' + e(pl.url) + '" target="_blank" rel="noopener">' + e(pl.name) + '</a>' : e(pl.name)) + '</p></div></footer>';
+        '<p class="ns-made">© ' + new Date().getFullYear() + ' ' + e(h.name || '') + ' · ' + TH('Website made with {platform}', { platform: pl.url ? '<a href="' + e(pl.url) + '" target="_blank" rel="noopener">' + e(pl.name) + '</a>' : e(pl.name) }) + '</p></div></footer>';
     }
     function applyTheme() {
       var t = data.theme || {}, pal = NS.PALETTES[t.palette] || NS.PALETTES.riga, f = NS.FONTS[t.fonts] || NS.FONTS.belle;
@@ -1083,16 +1712,18 @@
       st.setProperty('--b', c.bg); st.setProperty('--s', c.surface); st.setProperty('--i', c.ink); st.setProperty('--m', c.muted);
       st.setProperty('--l', c.line); st.setProperty('--p', c.brand); st.setProperty('--pi', c.brandInk); st.setProperty('--a', c.accent);
       st.setProperty('--so', c.soft); st.setProperty('--d', c.deep);
-      st.setProperty('--fd', '"' + f.display + '", Georgia, serif'); st.setProperty('--fb', '"' + f.body + '", system-ui, sans-serif');
+      st.setProperty('--fd', '"' + f.display + '", Georgia, serif'); st.setProperty('--fb', NS.bodyStack(t.fonts));
       root.setAttribute('data-orn', t.ornament || 'rich');
       root.setAttribute('data-dark', pal.dark ? '1' : '0');
       root.setAttribute('data-fonts', t.fonts || 'belle');
       root.classList.add('ns');
       if (opts.mode !== 'preview' && document.body === root.parentNode) document.body.style.background = c.bg;
-      var link = document.getElementById('ns-fonts');
-      var href = NS.fontsUrl(t.fonts);
-      if (!link) { link = document.createElement('link'); link.id = 'ns-fonts'; link.rel = 'stylesheet'; document.head.appendChild(link); }
-      if (link.getAttribute('href') !== href) link.setAttribute('href', href);
+      NS.fontsUrls(t.fonts).concat(['']).slice(0, 2).forEach(function (href, i) {
+        var lid = 'ns-fonts' + (i ? '2' : ''), link = document.getElementById(lid);
+        if (!href) { if (link) link.remove(); return; }
+        if (!link) { link = document.createElement('link'); link.id = lid; link.rel = 'stylesheet'; document.head.appendChild(link); }
+        if (link.getAttribute('href') !== href) link.setAttribute('href', href);
+      });
       document.documentElement.style.background = c.bg;
     }
 
@@ -1111,6 +1742,8 @@
     }
     function draw() {
       var y = window.scrollY;
+      NS.setLang(NS.siteLangs(data).indexOf(NS.lang) >= 0 || opts.mode === 'preview' ? NS.lang : 'en', data);
+      try { document.documentElement.lang = NS.lang; } catch (x) {}
       destroyWidgets();
       applyTheme();
       root.innerHTML = '<div id="ns-top"></div>' + nav() + '<main class="ns-main">' + enabledSections().map(function (s) { return sectionHtml(s.id); }).join('') + '</main>' + footer();
@@ -1134,7 +1767,7 @@
       if (heroFor || p) {
         var line = root.querySelector('.ns-hero-line');
         if (heroFor) heroFor.remove();
-        if (p && line) line.insertAdjacentHTML('afterend', '<p class="ns-hero-for">' + ic(p.icon) + '<span><b>For ' + e(p.name.toLowerCase()) + ':</b> ' + e(p.hook) + '</span></p>');
+        if (p && line) line.insertAdjacentHTML('afterend', heroFor(p));
       }
       S.filter = null;
       redrawSection('neighborhood');
@@ -1151,6 +1784,19 @@
       }
       if (S.persona && opts.stats) ping('p', S.persona);
       redrawPersonaParts();
+    }
+    function setLang(code) {
+      NS.setLang(code, data);
+      if (opts.mode !== 'preview') {
+        try { localStorage.setItem('ns.lang.' + (opts.slug || ''), NS.lang); } catch (x) {}
+        try {
+          var q = location.search.replace(/([?&])lang=[a-z]{2}&?/, '$1').replace(/[?&]$/, '');
+          q = NS.lang === 'en' ? q : q + (q ? '&' : '?') + 'lang=' + NS.lang;
+          history.replaceState(null, '', location.pathname + q + location.hash);
+        } catch (x) {}
+        if (data.seo && data.seo.title) document.title = TR(data.seo.title);
+      }
+      draw();
     }
     function ping(ev, p) {
       if (!opts.stats || !opts.slug) return;
@@ -1232,6 +1878,9 @@
       }
       var per = t.closest('[data-persona]');
       if (per) { setPersona(per.getAttribute('data-persona')); return; }
+      var lg = t.closest('[data-lang]');
+      if (lg) { setLang(lg.getAttribute('data-lang')); return; }
+      if (t.closest('[data-ask-again]')) { redrawSection('contact'); var af = root.querySelector('#ns-ask input'); if (af) af.focus(); return; }
       var lb = t.closest('[data-lb]');
       if (lb) {
         var group = lb.getAttribute('data-lb'), imgs = root.querySelectorAll('[data-lb="' + group + '"]');
@@ -1241,20 +1890,20 @@
       var room;
       if ((room = t.closest('[data-room-photos]'))) {
         var r = (data.rooms || []).filter(function (x) { return x && x.name; })[+room.getAttribute('data-room-photos')];
-        NS.Lightbox((r.photos || []).map(function (p) { return { src: mediaSrc(p), caption: r.name }; }), 0); return;
+        NS.Lightbox((r.photos || []).map(function (p) { return { src: mediaSrc(p), caption: TR(r.name) }; }), 0); return;
       }
       if ((room = t.closest('[data-room-pano]'))) {
         var r2 = roomAt(room.getAttribute('data-room-pano'));
-        var m = NS.Modal('<div class="ns-pano tall" data-pano></div><p class="ns-wt-note">' + e(r2.name) + ': drag to look around.</p>');
+        var m = NS.Modal('<div class="ns-pano tall" data-pano></div><p class="ns-wt-note">' + e(T('{room}: drag to look around.', { room: TR(r2.name) })) + '</p>');
         var pw = NS.Pano(m.el.querySelector('[data-pano]'), mediaSrc(r2.pano)); m.onclose = function () { pw.destroy(); }; return;
       }
       if ((room = t.closest('[data-room-tour]'))) {
         var r3 = roomAt(room.getAttribute('data-room-tour'));
-        NS.Modal('<div class="ns-embed"><iframe src="' + e(NS.videoInfo(r3.tour).embed || r3.tour) + '" allow="fullscreen; xr-spatial-tracking" allowfullscreen title="3D tour"></iframe></div>'); return;
+        NS.Modal('<div class="ns-embed"><iframe src="' + e(NS.videoInfo(r3.tour).embed || r3.tour) + '" allow="fullscreen; xr-spatial-tracking" allowfullscreen title="' + e(T('3D tour')) + '"></iframe></div>'); return;
       }
       if ((room = t.closest('[data-room-video]'))) {
         var r4 = roomAt(room.getAttribute('data-room-video')), vi = NS.videoInfo(mediaSrc(r4.video));
-        NS.Modal('<div class="ns-embed">' + (vi.type === 'file' ? '<video src="' + e(vi.src) + '" controls autoplay playsinline></video>' : '<iframe src="' + e(vi.embed) + '" allow="autoplay; fullscreen" allowfullscreen title="Room video"></iframe>') + '</div>'); return;
+        NS.Modal('<div class="ns-embed">' + (vi.type === 'file' ? '<video src="' + e(vi.src) + '" controls autoplay playsinline></video>' : '<iframe src="' + e(vi.embed) + '" allow="autoplay; fullscreen" allowfullscreen title="' + e(T('Room video')) + '"></iframe>') + '</div>'); return;
       }
       var car = t.closest('[data-car]');
       if (car) { var c = car.closest('.ns-room-media').querySelector('[data-carousel]'); if (c && c._car) c._car.step(+car.getAttribute('data-car')); return; }
@@ -1303,8 +1952,38 @@
       if (t.matches('[data-stay-persona]')) { S.persona = t.value; S.nights = null; S.day = 0; redrawPersonaParts(); var st = root.querySelector('#ns-stay'); if (st) st.scrollIntoView({ block: 'start' }); if (opts.stats) ping('p', t.value); }
       if (t.matches('[data-season]')) { S.season = t.value; redrawSection('stay'); }
     }
+    function onSubmit(ev) {
+      var f = ev.target.closest && ev.target.closest('[data-ask]');
+      if (!f) return;
+      ev.preventDefault();
+      var field = function (n) { return f.elements.namedItem(n); };
+      var msg = f.querySelector('.ns-ask-msg'), btn = f.querySelector('[type=submit]');
+      var say = function (text, bad) { msg.textContent = text; msg.className = 'ns-ask-msg' + (bad ? ' bad' : ''); };
+      var email = field('email').value.trim(), message = field('message').value.trim();
+      if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(email)) { say(T('Please check your email address.'), true); field('email').focus(); return; }
+      if (message.length < 5) { say(T('Please write a little more.'), true); field('message').focus(); return; }
+      if (!opts.ask || opts.mode === 'preview') { say(T('The form works on the published site.'), true); return; }
+      var failed = function () { btn.disabled = false; say(T('Sorry, the question could not be sent. Please email us instead.'), true); };
+      btn.disabled = true; say(T('Sending…'));
+      fetch(opts.ask, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify({
+        s: opts.slug, name: field('name').value.trim(), email: email, message: message, lang: NS.lang, persona: S.persona || '',
+        hp: field('website').value, t: Date.now() - S.askOpened }) })
+        .then(function (r) { return r.json().catch(function () { return { ok: false, error: 'server' }; }); })
+        .then(function (r) {
+          if (r && r.ok) {
+            f.outerHTML = '<div class="ns-ask-done" role="status">' + ic('check') + '<p>' + e(T('Thank you! {hotel} will answer you by email soon.', { hotel: NS.get(data, 'hotel.name', '') || T('the hotel') })) + '</p>' +
+              '<button class="ns-btn sm" type="button" data-ask-again>' + e(T('Ask another question')) + '</button></div>';
+            return;
+          }
+          btn.disabled = false;
+          var err = r && r.error;
+          say(T(err === 'email' ? 'Please check your email address.' : err === 'message' ? 'Please write a little more.' :
+            err === 'busy' ? 'Too many questions right now. Please try again later, or email us.' : 'Sorry, the question could not be sent. Please email us instead.'), true);
+        }, failed);
+    }
     root.addEventListener('click', onClick);
     root.addEventListener('change', onChange);
+    root.addEventListener('submit', onSubmit);
 
     draw();
     if (opts.mode === 'live') ping('view');
@@ -1313,9 +1992,10 @@
     return {
       update: function (d) { data = S.data = d; S.filter = null; draw(); },
       setPersona: setPersona,
+      setLang: setLang,
       scrollTo: function (id) { var el = root.querySelector('#ns-' + id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
       state: S,
-      destroy: function () { destroyWidgets(); if (S.map) S.map.destroy(); root.removeEventListener('click', onClick); root.removeEventListener('change', onChange); root.innerHTML = ''; }
+      destroy: function () { destroyWidgets(); if (S.map) S.map.destroy(); root.removeEventListener('click', onClick); root.removeEventListener('change', onChange); root.removeEventListener('submit', onSubmit); root.innerHTML = ''; }
     };
   };
 
@@ -1338,6 +2018,7 @@
       }
       if (m.type === 'ns-scroll' && NS.site) NS.site.scrollTo(m.section);
       if (m.type === 'ns-persona' && NS.site) NS.site.setPersona(m.persona);
+      if (m.type === 'ns-lang') { if (NS.site) NS.site.setLang(m.lang); else opts = Object.assign({}, opts, { lang: m.lang }); }
     });
     parent.postMessage({ type: 'ns-ready' }, '*');
   };
@@ -1387,7 +2068,7 @@
   NS.Modal = function (html) {
     var wrap = document.createElement('div');
     wrap.className = 'ns-modal';
-    wrap.innerHTML = '<div class="ns-modal-box" role="dialog" aria-modal="true"><button class="ns-x" data-x aria-label="Close">' + ic('x') + '</button>' + html + '</div>';
+    wrap.innerHTML = '<div class="ns-modal-box" role="dialog" aria-modal="true"><button class="ns-x" data-x aria-label="' + e(NS.t('Close')) + '">' + ic('x') + '</button>' + html + '</div>';
     (document.querySelector('.ns') || document.body).appendChild(wrap);
     var api = { el: wrap, onclose: null, close: close };
     function key(ev) { if (ev.key === 'Escape') close(); }
@@ -1404,8 +2085,8 @@
   NS.Lightbox = function (items, start) {
     if (!items.length) return null;
     var i = start || 0;
-    var m = NS.Modal('<div class="ns-lb"><img alt=""><p class="ns-lb-cap"></p><button class="ns-lb-btn prev" data-lb-go="-1" aria-label="Previous">' + ic('left') +
-      '</button><button class="ns-lb-btn next" data-lb-go="1" aria-label="Next">' + ic('right') + '</button><span class="ns-lb-n"></span></div>');
+    var m = NS.Modal('<div class="ns-lb"><img alt=""><p class="ns-lb-cap"></p><button class="ns-lb-btn prev" data-lb-go="-1" aria-label="' + e(NS.t('Previous')) + '">' + ic('left') +
+      '</button><button class="ns-lb-btn next" data-lb-go="1" aria-label="' + e(NS.t('Next')) + '">' + ic('right') + '</button><span class="ns-lb-n"></span></div>');
     m.el.classList.add('dark');
     var img = m.el.querySelector('img'), cap = m.el.querySelector('.ns-lb-cap'), n = m.el.querySelector('.ns-lb-n');
     function show() { var it = items[(i + items.length) % items.length]; img.src = it.src; cap.textContent = it.caption || ''; n.textContent = ((i + items.length) % items.length + 1) + ' / ' + items.length; }
@@ -1493,7 +2174,7 @@
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       state.ready = true; el.classList.add('ready');
     };
-    img.onerror = function () { el.classList.add('error'); el.insertAdjacentHTML('beforeend', '<p class="ns-pano-err">This 360° photo could not be loaded.</p>'); };
+    img.onerror = function () { el.classList.add('error'); el.insertAdjacentHTML('beforeend', '<p class="ns-pano-err">' + e(NS.t('This 360° photo could not be loaded.')) + '</p>'); };
     img.src = src;
     var raf = 0, last = 0;
     function frame(t) {
@@ -1557,7 +2238,7 @@
   }
   function popupHtml(p) {
     return '<div class="ns-pop">' + (p.wiki && p.wiki.thumb ? '<img src="' + e(p.wiki.thumb) + '" alt="">' : '') + '<b>' + e(p.name) + '</b><span>' + e(NS.CATS[p.cat].label) + ' · ' + e(NS.fmtWalk(p.walk)) + '</span>' +
-      (p.note ? '<em>' + e(p.note) + '</em>' : '') + '<a href="' + e(NS.mapsLink(p)) + '" target="_blank" rel="noopener">Open in Google Maps</a></div>';
+      (p.note ? '<em>' + e(p.note) + '</em>' : '') + '<a href="' + e(NS.mapsLink(p)) + '" target="_blank" rel="noopener">' + e(NS.t('Open in Google Maps')) + '</a></div>';
   }
 
   NS.Map = function (el, o) {
@@ -1687,7 +2368,7 @@
         el.classList.add('ready');
         map.addSource('ns-rings', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({ id: 'ns-rings', type: 'line', source: 'ns-rings', paint: { 'line-color': palette.c.accent, 'line-width': 1.6, 'line-dasharray': [2, 2], 'line-opacity': 0.9 } });
-        map.addLayer({ id: 'ns-rings-l', type: 'symbol', source: 'ns-rings', layout: { 'symbol-placement': 'line', 'text-field': ['concat', ['to-string', ['get', 'm']], ' min'], 'text-size': 11,
+        map.addLayer({ id: 'ns-rings-l', type: 'symbol', source: 'ns-rings', layout: { 'symbol-placement': 'line', 'text-field': ['concat', ['to-string', ['get', 'm']], ' ' + NS.t('min')], 'text-size': 11,
           'text-font': ['Noto Sans Regular'] }, paint: { 'text-color': palette.c.accent, 'text-halo-color': palette.dark ? '#000' : '#fff', 'text-halo-width': 1.2 } });
         map.addSource('ns-route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } } });
         map.addLayer({ id: 'ns-route', type: 'line', source: 'ns-route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': palette.c.brand, 'line-width': 4, 'line-opacity': 0.85 } });
@@ -1721,20 +2402,20 @@
     function draw() {
       var rings = [5, 10, 15].map(function (m) {
         var r = Math.sqrt(m / maxMin) * (W / 2 - 30);
-        return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r.toFixed(1) + '" class="rg"/><text x="' + cx + '" y="' + (cy - r + 14).toFixed(1) + '" class="rl">' + m + ' min</text>';
+        return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r.toFixed(1) + '" class="rg"/><text x="' + cx + '" y="' + (cy - r + 14).toFixed(1) + '" class="rl">' + m + ' ' + e(NS.t('min')) + '</text>';
       }).join('');
       var line = '';
       if (route && route.length) line = '<polyline class="rt" points="' + [[cx, cy]].concat(route.map(pos)).map(function (q) { return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' ') + '"/>';
       var dots = places.filter(function (p) { return p.lat != null && p.walk <= maxMin; }).slice(0, 140).map(function (p) {
         var q = pos(p), on = focusId != null && String(p.id) === String(focusId);
         return '<g class="pt' + (on ? ' on' : '') + '" data-pid="' + e(p.id) + '" transform="translate(' + q[0].toFixed(1) + ' ' + q[1].toFixed(1) + ')"><circle r="' + (on ? 9 : 6) + '" style="fill:' + NS.CATS[p.cat].color + '"/>' +
-          (on || p.wiki ? '<text x="10" y="4">' + e(p.name) + '</text>' : '') + '<title>' + e(p.name + ' · ' + p.walk + ' min') + '</title></g>';
+          (on || p.wiki ? '<text x="10" y="4">' + e(p.name) + '</text>' : '') + '<title>' + e(p.name + ' · ' + NS.t('{n} min', { n: p.walk })) + '</title></g>';
       }).join('');
-      el.innerHTML = '<svg class="ns-flat" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Map of places around the hotel">' +
+      el.innerHTML = '<svg class="ns-flat" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + e(NS.t('Map of places around the hotel')) + '">' +
         '<defs><radialGradient id="nsfg"><stop offset="0" class="g0"/><stop offset="1" class="g1"/></radialGradient></defs><rect width="' + W + '" height="' + H + '" fill="url(#nsfg)"/>' +
         rings + '<path class="cmp" d="M' + cx + ' 22l8 22h-16zM' + cx + ' 578l8-22h-16z"/><text x="' + cx + '" y="18" class="rl n">N</text>' + line + dots +
         '<g class="ht" transform="translate(' + cx + ' ' + cy + ')"><path d="M-14 16V-2a14 14 0 0 1 28 0v18z"/><text y="9">' + e((o.name || 'H').charAt(0)) + '</text></g></svg>' +
-        '<p class="ns-flat-note">Illustrated map: directions are true, distances are walking minutes.</p>';
+        '<p class="ns-flat-note">' + e(NS.t('Illustrated map: directions are true, distances are walking minutes.')) + '</p>';
     }
     el.addEventListener('click', function (ev) {
       var g = ev.target.closest('[data-pid]');

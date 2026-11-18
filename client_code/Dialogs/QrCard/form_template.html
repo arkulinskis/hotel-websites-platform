@@ -1,0 +1,19 @@
+<div class="ui dlg qr-dlg">
+  <h2 class="dlg-h">A QR card for reception</h2>
+  <p class="muted">Guests scan it at the desk, in the room or at breakfast, and your site opens on their phone in their own language.</p>
+  <div class="qr-grid">
+    <div class="qr-opts">
+      <label class="ui-field"><span>Layout</span><anvil-component type="DropDown" name="layout_select"></anvil-component></label>
+      <label class="ui-field"><span>Wi-Fi name <em>(optional)</em></span><anvil-component type="TextBox" name="wifi_name"></anvil-component></label>
+      <label class="ui-field"><span>Wi-Fi password <em>(optional)</em></span><anvil-component type="TextBox" name="wifi_pass"></anvil-component></label>
+      <anvil-component type="Label" name="wifi_note" prop:text="With Wi-Fi, the card gets a second code that joins the network. The name and password stay in this browser only; they are never saved on your site." prop:role='["fine-print"]'></anvil-component>
+    </div>
+    <div class="qr-preview" anvil:dom-node="box" aria-label="Preview of the card">
+      <iframe anvil:dom-node="frame" title="Preview of the printable card" tabindex="-1"></iframe>
+    </div>
+  </div>
+  <div class="ui-row end">
+    <anvil-component type="Button" name="close_button" prop:text="Close" prop:role='["btn", "btn-ghost"]'></anvil-component>
+    <anvil-component type="Button" name="print_button" prop:text="Print" prop:role='["btn", "btn-primary", "ic-print"]'></anvil-component>
+  </div>
+</div>

@@ -234,7 +234,7 @@
         return names[ref];
       });
       var h = out.hotel || {};
-      var opts = { mode: 'export', slug: slug, media: {}, platform: { name: UI.config.name, url: location.href.split('#')[0] } };
+      var opts = { mode: 'export', slug: slug, media: {}, platform: { name: UI.config.name, url: location.href.split('#')[0] }, ask: (window.APP_API || '') + '/ask' };
       var html = '<!doctype html>\n<html lang="' + UI.esc(out.lang || 'en') + '">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n' +
         '<title>' + UI.esc((out.seo && out.seo.title) || h.name || 'Hotel') + '</title>\n<meta name="description" content="' + UI.esc((out.seo && out.seo.description) || (out.hero && out.hero.headline) || '') + '">\n' +
         '<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n' +
@@ -554,5 +554,114 @@
     },
     newSiteData: function (factsJson) { return JSON.stringify(A.newSiteData(JSON.parse(factsJson))); },
     swatch: function (key) { var p = NS.PALETTES[key] || NS.PALETTES.riga; return JSON.stringify(p.c); }
+  };
+})();
+
+/* 4. The reception QR card (Dialogs/QrCard): a printable A4 page in the site's own palette and fonts, with a QR code
+   to the hotel site, a line in every language the site speaks, and (optionally) the Wi-Fi with its own QR code.
+     NSApp.qrReady()                          loads theme/assets/ns-qr.js (qrcode-generator, MIT) the first time
+     NSApp.qrCard(dataJson, url, optsJson)   -> the whole HTML document; opts {layout: tent | cards | poster, wifi: {name, pass}}
+     NSApp.printDoc(html)                     prints it from a hidden frame (no pop-up window) */
+(function () {
+  'use strict';
+  var A = window.NSApp, NS = window.NSSite, esc = function (s) { return NS.esc(s); };
+  A.qrReady = function () {
+    if (window.qrcode) return Promise.resolve(true);
+    return NS.loadScript(UI.themeBase() + 'ns-qr.js').then(function () { return true; });
+  };
+  A.qrSvg = function (text, ink) {
+    var q = window.qrcode(0, 'M');
+    if (window.qrcode.stringToBytesFuncs && window.qrcode.stringToBytesFuncs['UTF-8']) window.qrcode.stringToBytes = window.qrcode.stringToBytesFuncs['UTF-8'];
+    q.addData(String(text));
+    q.make();
+    var n = q.getModuleCount(), d = '';
+    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (q.isDark(r, c)) d += 'M' + c + ' ' + r + 'h1v1h-1z';
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 ' + (n + 6) + ' ' + (n + 6) + '" shape-rendering="crispEdges" role="img" aria-label="QR code">' +
+      '<rect x="-3" y="-3" width="' + (n + 6) + '" height="' + (n + 6) + '" fill="#fff"/><path d="' + d + '" fill="' + (ink || '#111') + '"/></svg>';
+  };
+  function wifiText(name, pass) {
+    var e = function (s) { return String(s || '').replace(/([\\;,:"])/g, '\\$1'); };
+    return 'WIFI:T:' + (pass ? 'WPA' : 'nopass') + ';S:' + e(name) + ';' + (pass ? 'P:' + e(pass) + ';' : '') + ';';
+  }
+  var LINES = ['Scan to plan your stay', 'Your stay hour by hour, the neighbourhood map, and a place to ask us anything.'];
+
+  A.qrCard = function (dataJson, url, optsJson) {
+    var data = JSON.parse(dataJson || '{}'), o = JSON.parse(optsJson || '{}');
+    var h = data.hotel || {}, t = data.theme || {};
+    var pal = (NS.PALETTES[t.palette] || NS.PALETTES.riga).c, f = NS.FONTS[t.fonts] || NS.FONTS.belle;
+    var langs = NS.siteLangs(data), layout = o.layout || 'tent', wifi = o.wifi || {};
+    var name = h.name || 'Our hotel', stars = '', short = String(url || '').replace(/^https?:\/\//, '');
+    for (var i = 0; i < (+h.stars || 0); i++) stars += '★';
+    var dark = (NS.PALETTES[t.palette] || {}).dark;
+    var qrInk = dark ? '#111' : pal.deep;
+    var qr = A.qrSvg(url || 'https://arvistay.com', qrInk);
+    var wifiQr = wifi.name ? A.qrSvg(wifiText(wifi.name, wifi.pass), '#111') : '';
+    function say(k, lang) { return lang === 'en' ? k : (NS.tIn(lang, k) || k); }
+    var heads = langs.map(function (l, k) { return '<p class="' + (k ? 'alt' : 'main') + '" lang="' + l + '">' + esc(say(LINES[0], l)) + '</p>'; }).join('');
+    var sub = '<p class="sub" lang="' + langs[0] + '">' + esc(LINES[1]) + '</p>';
+    var wifiBox = wifi.name ? '<div class="wifi">' + wifiQr + '<div><b>Wi-Fi</b><span>' + esc(wifi.name) + '</span>' + (wifi.pass ? '<span class="pw">' + esc(wifi.pass) + '</span>' : '') + '</div></div>' : '';
+    var corner = '<svg class="cn" viewBox="0 0 80 80" aria-hidden="true"><path d="M2 78V30C2 14 14 2 30 2h48M10 78V36c0-14 12-26 26-26h42"/><path d="M2 50c10 0 18-6 18-16 0-6-4-10-9-10-4 0-7 3-7 7 0 3 2 5 5 5"/><circle cx="30" cy="30" r="3"/></svg>';
+    var initial = (String(name).replace(/^(hotel|boutique|the|villa|pension|guesthouse|hostel)\s+/ig, '').trim() || 'H').charAt(0).toUpperCase();
+    var mono = '<span class="mono"><svg viewBox="0 0 48 56"><path d="M4 54V22a20 20 0 0 1 40 0v32z"/><path d="M9 54V23a15 15 0 0 1 30 0v31"/></svg><b>' + esc(initial) + '</b></span>';
+    function panel(cls) {
+      return '<section class="card ' + cls + '"><div class="frame">' + corner.replace('cn', 'cn tl') + corner.replace('cn', 'cn tr') + corner.replace('cn', 'cn bl') + corner.replace('cn', 'cn br') +
+        '<div class="txt"><div class="brand">' + mono + '<div><b class="name">' + esc(name) + '</b>' + (stars ? '<span class="stars">' + stars + '</span>' : '') +
+        (h.address ? '<span class="addr">' + esc(h.address) + '</span>' : '') + '</div></div>' + heads + sub + wifiBox + '</div>' +
+        '<div class="code">' + qr + '<span class="url">' + esc(short) + '</span></div></div></section>';
+    }
+    var body;
+    if (layout === 'cards') body = '<div class="sheet cards">' + [0, 1, 2, 3].map(function () { return panel('small'); }).join('') + '</div>';
+    else if (layout === 'poster') body = '<div class="sheet poster">' + panel('big') + '</div>';
+    else body = '<div class="sheet tent">' + panel('wide flip') + '<div class="fold"><span>fold here</span></div>' + panel('wide') + '</div>';
+    var css = '@page{size:A4 portrait;margin:0}*{box-sizing:border-box}html,body{margin:0;background:#e9e6e0}' +
+      'body{font-family:' + NS.bodyStack(t.fonts) + ';color:' + pal.ink + ';-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+      '.sheet{width:210mm;height:297mm;margin:0 auto;background:#fff;position:relative;overflow:hidden}' +
+      '.card{background:' + pal.bg + ';position:relative;display:flex}' +
+      '.frame{position:absolute;inset:6mm;border:.6mm solid ' + pal.accent + ';border-radius:5mm;outline:.25mm solid ' + pal.accent + ';outline-offset:-2.2mm;display:flex;gap:8mm;align-items:center;padding:10mm 12mm}' +
+      '.cn{position:absolute;width:13mm;height:13mm;fill:none;stroke:' + pal.accent + ';stroke-width:2.2;stroke-linecap:round}' +
+      '.cn circle{fill:' + pal.accent + ';stroke:none}.cn.tl{top:2.5mm;left:2.5mm}.cn.tr{top:2.5mm;right:2.5mm;transform:scaleX(-1)}.cn.bl{bottom:2.5mm;left:2.5mm;transform:scaleY(-1)}.cn.br{bottom:2.5mm;right:2.5mm;transform:scale(-1,-1)}' +
+      '.txt{flex:1;min-width:0;display:grid;gap:2.2mm}.brand{display:flex;gap:3mm;align-items:center;margin-bottom:1.5mm}' +
+      '.mono{position:relative;display:grid;place-items:center;width:10mm;height:12mm;flex:none;color:' + pal.accent + '}' +
+      '.mono svg{position:absolute;inset:0;width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2.2}.mono b{position:relative;top:1mm;font:600 5mm/1 "' + f.display + '",Georgia,serif;color:' + pal.ink + '}' +
+      '.name{display:block;font:600 7mm/1.05 "' + f.display + '",Georgia,serif;color:' + pal.ink + '}.stars{display:block;color:' + pal.accent + ';font-size:3.2mm;letter-spacing:.6mm}' +
+      '.addr{display:block;font-size:2.8mm;color:' + pal.muted + ';margin-top:.6mm}' +
+      'p{margin:0}.main{font:600 9.5mm/1.05 "' + f.display + '",Georgia,serif;color:' + pal.brand + '}.alt{font:500 4.4mm/1.25 "' + f.display + '",Georgia,serif;color:' + pal.ink + '}' +
+      '.sub{font-size:3.3mm;line-height:1.4;color:' + pal.muted + ';margin-top:1mm;max-width:95mm}' +
+      '.wifi{display:flex;gap:3mm;align-items:center;margin-top:2mm;padding:2.2mm 3mm;border:.3mm dashed ' + pal.line + ';border-radius:3mm;background:' + pal.surface + ';width:max-content;max-width:100%}' +
+      '.wifi svg{width:15mm;height:15mm;flex:none}.wifi b{display:block;font-size:2.6mm;letter-spacing:.4mm;text-transform:uppercase;color:' + pal.accent + '}' +
+      '.wifi span{display:block;font-size:3.6mm;font-weight:600;overflow-wrap:anywhere}.wifi .pw{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:500}' +
+      '.code{flex:none;display:grid;justify-items:center;gap:2mm}.code svg{width:52mm;height:52mm;border-radius:3mm;display:block}' +
+      '.url{font-size:2.7mm;color:' + pal.muted + ';max-width:56mm;text-align:center;overflow-wrap:anywhere}' +
+      '.tent .card{height:148.5mm}.tent .flip{transform:rotate(180deg)}' +
+      '.fold{position:absolute;left:0;right:0;top:148.5mm;border-top:.3mm dashed #999;height:0;z-index:2}.fold span{position:absolute;right:8mm;top:-2.2mm;background:#fff;padding:0 2mm;font:2.4mm system-ui,sans-serif;color:#777}' +
+      '.cards{display:grid;grid-template-columns:105mm 105mm;grid-template-rows:148.5mm 148.5mm}.cards .card{border:.2mm dashed #bbb}' +
+      '.small .frame{inset:4.5mm;flex-direction:column;justify-content:center;gap:5mm;padding:9mm 7mm;text-align:center}.small .brand{justify-content:center}.small .txt{justify-items:center}' +
+      '.small .name{font-size:6mm}.small .main{font-size:6.6mm}.small .alt{font-size:3.4mm}.small .sub{font-size:2.8mm}.small .code svg{width:42mm;height:42mm}.small .wifi svg{width:12mm;height:12mm}' +
+      '.poster .card{height:297mm}.big .frame{inset:10mm;flex-direction:column;justify-content:center;gap:12mm;text-align:center;padding:20mm 16mm}' +
+      '.big .brand{justify-content:center;gap:5mm;margin-bottom:4mm}.big .mono{width:18mm;height:21mm}.big .mono b{font-size:9mm;top:1.6mm}.big .name{font-size:13mm}.big .stars{font-size:5mm}.big .addr{font-size:4.2mm}' +
+      '.big .txt{justify-items:center;gap:4mm}.big .main{font-size:16mm}.big .alt{font-size:7.5mm}.big .sub{font-size:5.4mm;max-width:150mm}' +
+      '.big .code svg{width:95mm;height:95mm}.big .url{font-size:4mm;max-width:120mm}.big .wifi svg{width:22mm;height:22mm}.big .wifi span{font-size:5mm}' +
+      '@media screen{body{padding:0}}@media print{html,body{background:#fff}}';
+    return '<!doctype html><html lang="' + langs[0] + '"><head><meta charset="utf-8"><title>' + esc(name) + ' QR card</title>' +
+      NS.fontsUrls(t.fonts).map(function (u) { return '<link rel="stylesheet" href="' + esc(u) + '">'; }).join('') + '<sty' + 'le>' + css + '</sty' + 'le></head><body>' + body + '</body></html>';
+  };
+
+  A.printDoc = function (html) {
+    return new Promise(function (resolve) {
+      var old = document.getElementById('ns-print-frame');
+      if (old) old.remove();
+      var fr = document.createElement('iframe');
+      fr.id = 'ns-print-frame';
+      fr.setAttribute('aria-hidden', 'true');
+      fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+      fr.onload = function () {
+        var w = fr.contentWindow, go = function () { try { w.focus(); w.print(); } catch (e) { console.error(e); } resolve(true); };
+        var fonts = w.document.fonts;
+        if (fonts && fonts.ready) Promise.race([fonts.ready, new Promise(function (r) { setTimeout(r, 2500); })]).then(function () { setTimeout(go, 150); });
+        else setTimeout(go, 600);
+      };
+      document.body.appendChild(fr);
+      fr.srcdoc = html;
+    });
   };
 })();

@@ -24,7 +24,7 @@
   --radius: 18px; --radius-sm: 11px;
   --shadow: 0 1px 2px rgba(45, 38, 20, .06), 0 10px 28px rgba(45, 38, 20, .08);
   --shadow-lg: 0 22px 60px rgba(45, 38, 20, .2);
-  --font-body: "Jost", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-body: "Jost", "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;  /* Figtree draws the Latvian letters Jost gets wrong */
   --font-display: "Cormorant Garamond", "Cormorant", Georgia, serif;
   --font-deco: "Federo", "Jost", sans-serif;
   --maxw: 1180px;
@@ -605,6 +605,23 @@ html.ui-modal-open { overflow: hidden; }
 .ed-per .fit i { width: 70px; height: 5px; border-radius: 3px; background: var(--c-surface-2); position: relative; overflow: hidden; }
 .ed-per .fit i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--w); background: var(--c-accent); }
 .ed-per input[type=checkbox], .ed-per input[type=radio] { width: 18px; height: 18px; accent-color: var(--c-brand); }
+/* reception QR card (Dialogs/QrCard) */
+.qr-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.qr-preview { position: relative; width: 100%; aspect-ratio: 210 / 297; overflow: hidden; border-radius: 10px; border: 1px solid var(--c-line);
+  background: #fff; box-shadow: 0 10px 30px rgba(0, 0, 0, .12); }
+.qr-preview iframe { position: absolute; top: 0; left: 0; width: 794px; height: 1123px; border: 0; transform-origin: 0 0; pointer-events: none; }
+@media (max-width: 640px) { .qr-grid { grid-template-columns: minmax(0, 1fr); } .qr-preview { max-width: 320px; margin: 0 auto; } }
+
+/* Languages tab (ns-editor.js PANELS.langs) */
+.ed-trbar { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--c-line); border-radius: 14px; background: var(--c-surface); margin-bottom: 8px; }
+.ed-trbar .fit i { display: block; height: 6px; border-radius: 3px; background: var(--c-surface-2); position: relative; overflow: hidden; }
+.ed-trbar .fit i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--w); background: var(--c-accent); }
+.ed-trbar label { display: inline-flex; gap: 6px; align-items: center; color: var(--c-muted); }
+.ed-trg { margin: 18px 0 6px; font-size: .78rem; letter-spacing: .02em; color: var(--c-muted); }
+.ed-tr { display: grid; gap: 4px; padding: 10px 0; border-bottom: 1px dashed var(--c-line); }
+.ed-tr-en { margin: 0; font-size: .82rem; color: var(--c-muted); white-space: pre-line; max-height: 7.5em; overflow: auto; }
+.ed-tr input, .ed-tr textarea { width: 100%; }
+.ed-ask { margin-top: 12px; }
 .ed-story { font-size: .85rem; border-left: 1px solid var(--c-line); padding-left: 12px; margin: 8px 0 14px; }
 .ed-story h4 { margin: 10px 0 4px; font-size: .95rem; }
 .ed-story p { margin: 0 0 6px; }
@@ -820,7 +837,26 @@ anvil-dropzone { display: contents; }
 .item-title { gap: 8px; }
 .anvil-role-item-body { overflow-wrap: anywhere; margin-top: 2px; }
 .anvil-role-initials { font: 700 .85rem/1 var(--font-body); color: inherit; }
-.nav-link { display: inline-flex; align-items: center; gap: 7px; }
+.nav-link { display: inline-flex; align-items: center; gap: 7px; position: relative; }
+.nav-count { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--c-accent); color: var(--c-on-accent, #1b1408);
+  font: 700 .75rem/20px var(--font-body); text-align: center; font-variant-numeric: lining-nums tabular-nums; }
+.ui-tabbar .nav-count { position: absolute; top: 2px; left: calc(50% + 6px); }
+/* guest questions (Pages/Questions, Items/QuestionRow) */
+.qs-head { margin: 8px 0 18px; }
+.qs-head p { max-width: 46em; }
+.qs-filter { justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.anvil-role-qs-site { max-width: 280px; }
+.anvil-role-qs-list > div { display: grid; gap: 12px; }
+.qs-item .meta { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.qs-item .qs-mail { font-size: .9rem; overflow-wrap: anywhere; }
+.qs-msg { margin: 10px 0 4px; white-space: pre-line; overflow-wrap: anywhere; font-size: 1.02rem; line-height: 1.55; }
+.qs-persona { margin: 0 0 8px; }
+.qs-actions { gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.qs-tip { display: flex; gap: 14px; align-items: flex-start; margin-top: 26px; padding: 18px 20px; }
+.qs-tip > .ic { width: 22px; height: 22px; color: var(--c-accent); margin-top: 2px; }
+.qs-tip p { margin: 4px 0 0; max-width: 70ch; }
+.st-qs { display: inline-flex; gap: 6px; align-items: center; font-weight: 600; font-size: .88rem; color: var(--c-brand); text-decoration: none; margin-top: 4px; }
+.st-qs:hover { text-decoration: underline; }
 .ui-tabbar .nav-link { display: grid; }
 .ui-nav .nav-link.on, .ui-tabbar a.on { }
 .anvil-role-dlg-title, .anvil-modal-content .ui h2.dlg-h { font: 700 1.5rem/1.15 var(--font-display); color: var(--c-ink); margin: 0 0 .5em; padding-right: 36px; }

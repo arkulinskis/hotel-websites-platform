@@ -5,7 +5,7 @@
 
      NSEd.create(el, dataJson, siteJson, hooks) -> ed
        ed.draw(tab)          draw one tab's panel into el ('start', 'basics', 'look', 'texts', 'rooms', 'media', 'area',
-                             'guests', 'booking'; 'publish' is a Python Form)
+                             'guests', 'booking', 'langs'; 'publish' is a Python Form)
        ed.dataJson()         the site JSON now (what save_site stores)
        ed.data()             the live JS object (for NSApp.exportSite)
        ed.get(path) / ed.set(path, value)   one field (the Publish panel's SEO fields)
@@ -23,7 +23,7 @@
   'use strict';
   var esc = UI.esc, NS = window.NSSite;
   var TABS = [['start', 'Overview', 'grid'], ['basics', 'Hotel', 'home'], ['look', 'Look', 'sparkle'], ['texts', 'Texts', 'edit'], ['rooms', 'Rooms', 'bed'],
-    ['media', 'Media', 'image'], ['area', 'Area', 'map'], ['guests', 'Guests', 'users'], ['booking', 'Booking', 'calendar'], ['publish', 'Publish', 'globe']];
+    ['media', 'Media', 'image'], ['area', 'Area', 'map'], ['guests', 'Guests', 'users'], ['booking', 'Booking', 'calendar'], ['langs', 'Languages', 'lang'], ['publish', 'Publish', 'globe']];
   UI.ICONS.bed = '<path d="M3 18v-7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v7M3 15h18M3 18v2M21 18v2"/><path d="M6 9V7h5v2M13 9V7h5v2"/>';
   var SECTION_TAB = { hero: 'look', personas: 'guests', story: 'texts', highlights: 'texts', rooms: 'rooms', walkthrough: 'media', gallery: 'media', stay: 'guests',
     neighborhood: 'area', film: 'media', dining: 'media', reviews: 'booking', booking: 'booking', faq: 'booking', contact: 'basics' };
@@ -85,6 +85,52 @@
       '<button class="ui-btn sm ghost" data-upload="' + esc(path) + '">' + UI.icon('camera') + 'Upload photos</button></div>';
   }
 
+  /* The owner's texts the Languages tab offers for translation, by group (paths in the site JSON; * = every item).
+     Translations live in data.i18n[lang][english text] (see site/15-i18n.js). */
+  var TR_GROUPS = [
+    ['The hotel', ['hotel.tagline', 'hotel.kind', 'hotel.area', 'hotel.checkin_note', 'hotel.breakfast', 'hotel.building', 'hotel.airport', 'hotel.parking']],
+    ['Opening screen', ['hero.headline']],
+    ['Section titles', ['sections.*.title']],
+    ['Your story', ['story.eyebrow', 'story.title', 'story.body', 'story.caption', 'story.image_alt']],
+    ['Why stay here', ['highlights.*.title', 'highlights.*.text']],
+    ['Rooms', ['rooms_intro', 'rooms.*.name', 'rooms.*.beds', 'rooms.*.text', 'rooms.*.features.*']],
+    ['Photos, videos and tours', ['gallery.title', 'gallery.items.*.caption', 'walkthrough.title', 'walkthrough.lead', 'walkthrough.items.*.title',
+      'walkthrough.items.*.text', 'walkthrough.items.*.stops.*.caption', 'videos.*.title', 'videos.*.text']],
+    ['Neighbourhood', ['neighborhood.title', 'neighborhood.intro', 'places.*.note']],
+    ['Guests', ['personas.title', 'personas.lead', 'personas.overrides.*.intro', 'personas.overrides.*.tip']],
+    ['Dining', ['dining.eyebrow', 'dining.title', 'dining.body', 'dining.short', 'dining.facts.*.text', 'dining.link_label']],
+    ['Booking and payment', ['booking.intro', 'booking.step1', 'booking.step3', 'booking.payment.when', 'booking.payment.note', 'booking.perk',
+      'booking.channels.*.label', 'booking.policies.*.title', 'booking.policies.*.text']],
+    ['Questions', ['faq.*.q', 'faq.*.a']],
+    ['Getting here', ['contact.directions.*.title', 'contact.directions.*.text']],
+    ['Search engines', ['seo.title', 'seo.description']]
+  ];
+  var EXTRA_LANGS = ['lv', 'ru', 'de'];
+  function collectTexts(obj, path) {
+    var parts = path.split('.'), out = [];
+    (function walk(cur, i) {
+      if (cur == null) return;
+      if (i === parts.length) { if (typeof cur === 'string' && cur.trim()) out.push(cur); return; }
+      if (parts[i] === '*') {
+        if (Array.isArray(cur)) cur.forEach(function (x) { walk(x, i + 1); });
+        else if (typeof cur === 'object') Object.keys(cur).forEach(function (k) { walk(cur[k], i + 1); });
+        return;
+      }
+      walk(cur[parts[i]], i + 1);
+    })(obj, 0);
+    return out;
+  }
+  /* [{group, texts: [english…]}] without repeats, and the set of every text */
+  function translatable(data) {
+    var seen = {}, groups = [];
+    TR_GROUPS.forEach(function (g) {
+      var texts = [];
+      g[1].forEach(function (path) { collectTexts(data, path).forEach(function (t) { if (!seen[t]) { seen[t] = 1; texts.push(t); } }); });
+      if (texts.length) groups.push({ group: g[0], texts: texts });
+    });
+    return { groups: groups, all: seen };
+  }
+
   var S = null;   // editor state, per visit
   function D() { return S.data; }
 
@@ -92,7 +138,7 @@
 
   function create(el, dataJson, siteJson, hooks) {
     var st = S = { data: JSON.parse(dataJson), site: JSON.parse(siteJson), tab: 'start', media: null, persona: null, pn: null,
-      pq: '', pcat: '', plimit: 80, preview: null };
+      pq: '', pcat: '', plimit: 80, preview: null, trlang: null, tronly: false, plang: 'en' };
     if (!st.data.sections || !st.data.sections.length) st.data.sections = NS.SECTIONS.map(function (s) { return { id: s.id, on: true }; });
     NS.SECTIONS.forEach(function (s) { if (!st.data.sections.some(function (x) { return x.id === s.id; })) st.data.sections.push({ id: s.id, on: false }); });
     var view = el;
@@ -151,6 +197,8 @@
           '<button class="ui-btn sm" data-relocate>' + UI.icon('search') + 'Find the address on the map</button>' +
           '<h3>' + UI.icon('mail') + 'Contact</h3><div class="ed-g2">' + fld('Phone', 'hotel.phone', { type: 'tel' }) + fld('Email', 'hotel.email', { type: 'email' }) + '</div>' +
           fld('WhatsApp number', 'hotel.whatsapp', { opt: true, ph: '+371 2000 0000' }) +
+          '<label class="ed-chip ed-ask"><input type="checkbox" data-askon' + (NS.get(st.data, 'contact.ask_off', false) ? '' : ' checked') + '>Show an "Ask us a question" form on the site</label>' +
+          '<p class="ui-hint">Guests\' questions land in your <a href="#questions">Questions</a> inbox, and we email you when one arrives. You answer by email.</p>' +
           '<h3>' + UI.icon('clock') + 'Times and practical things</h3><div class="ed-g2">' + fld('Check-in from', 'hotel.checkin', { type: 'time' }) + fld('Check-out until', 'hotel.checkout', { type: 'time' }) + '</div>' +
           fld('Arrival note', 'hotel.checkin_note', { area: true, rows: 2, opt: true }) + fld('Breakfast', 'hotel.breakfast', { area: true, rows: 2, opt: true }) +
           fld('The building', 'hotel.building', { area: true, rows: 2, opt: true, hint: 'One sentence about the house. Used in drafted texts.' }) +
@@ -331,6 +379,40 @@
       }
     };
 
+    PANELS.langs = function () {
+      var d = st.data, on = (d.langs || []).filter(function (c) { return EXTRA_LANGS.indexOf(c) >= 0; });
+      var html = '<h2>Languages</h2><p class="muted">Your site is written in English. Switch on more languages and guests get a language button ' +
+        '(and their browser\'s language first). The site\'s own words, the guest profiles and the hour-by-hour stays are translated for you. ' +
+        'Translate your own texts below; anything you leave empty shows in English.</p>' +
+        '<div class="ed-chips">' + EXTRA_LANGS.map(function (c) { return chip('langs', c, NS.LANGS[c].name); }).join('') + '</div>';
+      if (!on.length) return html + '<p class="small muted" style="margin-top:14px">Latvian, Russian and German are ready. More can be added on request.</p>';
+      if (on.indexOf(st.trlang) < 0) st.trlang = on[0];
+      var lang = st.trlang, words = (d.i18n && d.i18n[lang]) || {}, tr = translatable(d);
+      var total = 0, done = 0;
+      tr.groups.forEach(function (g) { g.texts.forEach(function (t) { total++; if (words[t] || NS.tIn(lang, t)) done++; }); });
+      var stale = Object.keys(words).filter(function (k) { return !tr.all[k]; });
+      html += '<h3>' + UI.icon('globe') + 'Preview in</h3><div class="ui-seg" role="group" aria-label="Preview language">' + ['en'].concat(on).map(function (c) {
+        return '<button type="button" data-plang="' + c + '" class="' + (st.plang === c ? 'on' : '') + '" aria-pressed="' + (st.plang === c) + '">' + esc(NS.LANGS[c].name) + '</button>'; }).join('') + '</div>' +
+        '<h3>' + UI.icon('edit') + 'Your texts</h3>' +
+        (on.length > 1 ? '<div class="ui-seg" role="group" aria-label="Language to translate into" style="margin-bottom:10px">' + on.map(function (c) {
+          return '<button type="button" data-trlang="' + c + '" class="' + (c === lang ? 'on' : '') + '" aria-pressed="' + (c === lang) + '">' + esc(NS.LANGS[c].name) + '</button>'; }).join('') + '</div>' : '') +
+        '<div class="ed-trbar"><div class="ed-trbar-t"><b>' + done + ' of ' + total + '</b> texts in ' + esc(NS.LANGS[lang].name) + '</div><div class="fit"><i style="--w:' + (total ? Math.round(done / total * 100) : 100) + '%"></i></div>' +
+        '<label class="small"><input type="checkbox" data-tronly' + (st.tronly ? ' checked' : '') + '> Only the ones still in English</label></div>' +
+        (stale.length ? '<div class="ed-check no">' + UI.icon('info') + '<span>' + stale.length + ' older translation' + (stale.length > 1 ? 's' : '') + ' no longer match' + (stale.length > 1 ? '' : 'es') + ' your English (you changed it).</span><button class="ui-btn sm" data-trclean>Remove</button></div>' : '') +
+        tr.groups.map(function (g) {
+          var rows = g.texts.filter(function (t) { return !st.tronly || !(words[t] || NS.tIn(lang, t)); });
+          if (!rows.length) return '';
+          return '<h4 class="ed-trg">' + esc(g.group) + '</h4>' + rows.map(function (t) {
+            var auto = NS.tIn(lang, t), long = t.length > 70 || /\n/.test(t);
+            var attrs = ' data-tr="' + esc(t) + '" lang="' + lang + '" aria-label="' + esc(NS.LANGS[lang].name + ': ' + t.slice(0, 60)) + '" placeholder="' + esc(auto || 'Shows in English until you translate it') + '"';
+            return '<div class="ed-tr"><p class="ed-tr-en">' + esc(t) + '</p>' + (long ? '<textarea rows="' + Math.min(10, Math.max(2, Math.ceil(t.length / 60))) + '"' + attrs + '>' + esc(words[t] || '') + '</textarea>'
+              : '<input type="text"' + attrs + ' value="' + esc(words[t] || '') + '">') + '</div>';
+          }).join('');
+        }).join('') +
+        (total ? '' : '<p class="small muted">Write some texts first (Texts, Rooms, Booking tabs).</p>');
+      return html;
+    };
+
     function listEditor(path, body, template, addLabel) {
       var arr = list(st.data, path);
       return arr.map(function (x, i) {
@@ -372,6 +454,14 @@
     /* ---------------------------------------------------------------- events */
     function onInput(e) {
       var t = e.target;
+      if (t.matches('[data-tr]')) {
+        var tl = st.trlang, key = t.getAttribute('data-tr'), val = t.value;
+        if (!st.data.i18n || typeof st.data.i18n !== 'object') st.data.i18n = {};
+        var bag = st.data.i18n[tl] = st.data.i18n[tl] || {};
+        if (val.trim()) bag[key] = val; else delete bag[key];
+        changed();
+        return;
+      }
       if (t.matches('[data-pq]')) { st.pq = t.value; var sc = el.closest('.ed-panel') || el, y = sc.scrollTop; drawPanel(); var inp = el.querySelector('[data-pq]'); inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); sc.scrollTop = y; return; }
       if (!t.matches('[data-k]') || t.type === 'radio' || t.type === 'checkbox' || t.tagName === 'SELECT') return;
       var v = t.value;
@@ -383,6 +473,8 @@
     function onChange(e) {
       var t = e.target;
       if (t.matches('[data-pcat]')) { st.pcat = t.value; drawPanel(); return; }
+      if (t.matches('[data-askon]')) { set(st.data, 'contact.ask_off', !t.checked); changed(); return; }
+      if (t.matches('[data-tronly]')) { st.tronly = t.checked; drawPanel(); return; }
       if (t.matches('[data-todo]')) {
         var done = list(st.data, 'todo_done'), txt = t.getAttribute('data-todo'), k = done.indexOf(txt);
         if (t.checked && k < 0) done.push(txt); if (!t.checked && k >= 0) done.splice(k, 1);
@@ -391,7 +483,8 @@
       if (t.matches('[data-arr]')) {
         var arr = list(st.data, t.getAttribute('data-arr')), i = arr.indexOf(t.value);
         if (t.checked && i < 0) arr.push(t.value); if (!t.checked && i >= 0) arr.splice(i, 1);
-        changed({ top: true, panel: t.getAttribute('data-arr') === 'personas.enabled' }); return;
+        if (t.getAttribute('data-arr') === 'langs' && st.plang !== 'en' && arr.indexOf(st.plang) < 0) { st.plang = 'en'; post({ type: 'ns-lang', lang: 'en' }); }
+        changed({ top: true, panel: t.getAttribute('data-arr') === 'personas.enabled' || t.getAttribute('data-arr') === 'langs' }); return;
       }
       if (t.matches('[data-k]') && (t.type === 'radio' || t.type === 'checkbox' || t.tagName === 'SELECT')) {
         var path = t.getAttribute('data-k'), v = t.type === 'checkbox' ? t.checked : t.value;
@@ -417,6 +510,13 @@
     function onClick(e) {
       var t = e.target, b;
       if ((b = t.closest('[data-tab]'))) { hooks.tab(b.getAttribute('data-tab')); return; }
+      if ((b = t.closest('[data-plang]'))) { st.plang = b.getAttribute('data-plang'); post({ type: 'ns-lang', lang: st.plang }); drawPanel(); return; }
+      if ((b = t.closest('[data-trlang]'))) { st.trlang = b.getAttribute('data-trlang'); drawPanel(); return; }
+      if (t.closest('[data-trclean]')) {
+        var tr0 = translatable(st.data), bag0 = (st.data.i18n || {})[st.trlang] || {};
+        Object.keys(bag0).forEach(function (k) { if (!tr0.all[k]) delete bag0[k]; });
+        changed({ panel: true }); return;
+      }
       if ((b = t.closest('[data-add]'))) {
         var tpl = b.getAttribute('data-tpl') ? JSON.parse(b.getAttribute('data-tpl')) : { id: 'r' + Date.now().toString(36), name: 'New room', beds: '1 double bed', guests: '2', tags: [], features: [], photos: [] };
         list(st.data, b.getAttribute('data-add')).push(tpl); changed({ panel: true }); return;

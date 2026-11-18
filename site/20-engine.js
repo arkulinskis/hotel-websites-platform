@@ -43,7 +43,7 @@
   };
   /* walking minutes: streets are ~30% longer than a straight line, 80 m a minute */
   NS.walkMin = function (m) { return Math.max(1, Math.round(m * 1.3 / 80)); };
-  NS.fmtWalk = function (min) { return min <= 1 ? '1 min walk' : min > 45 ? Math.round(min / 6) + ' min by tram or taxi' : min + ' min walk'; };
+  NS.fmtWalk = function (min) { return min <= 1 ? NS.t('1 min walk') : min > 45 ? NS.t('{n} min by tram or taxi', { n: Math.round(min / 6) }) : NS.t('{n} min walk', { n: min }); };
   NS.firstSentence = function (text, max) {
     text = String(text || '').replace(/\s+/g, ' ').trim();
     if (!text) return '';
@@ -133,17 +133,17 @@
   NS.numbers = function (data, p) {
     var places = NS.places(data), out = [];
     var landmark = places.filter(function (x) { return x.cat === 'sight' && x.wiki; })[0] || NS.nearest(places, 'sight');
-    if (landmark) out.push({ n: landmark.walk, unit: 'min', label: 'on foot to ' + landmark.name, icon: 'walk' });
+    if (landmark) out.push({ n: landmark.walk, unit: NS.t('min'), label: NS.t('on foot to {place}', { place: landmark.name }), icon: 'walk' });
     var cats = p ? Object.keys(p.w).sort(function (a, b) { return p.w[b] - p.w[a]; }) : ['cafe', 'restaurant', 'museum', 'park', 'bar'];
     cats.forEach(function (cat) {
       if (out.length >= 4 || cat === 'transport' || cat === 'essentials') return;
       var n = NS.countWithin(places, cat, 10);
-      if (n >= 2) out.push({ n: n, unit: '', label: NS.CATS[cat].plural + ' within 10 minutes', icon: NS.CATS[cat].icon });
+      if (n >= 2) out.push({ n: n, unit: '', label: NS.t('{things} within 10 minutes', { things: NS.t(NS.CATS[cat].plural) }), icon: NS.CATS[cat].icon });
     });
     var st = NS.nearest(places, 'transport', function (x) { return /station|stacija|bahnhof|terminal|vokzal/i.test(x.name + ' ' + (x.sub || '')); });
-    if (st && out.length < 4) out.push({ n: st.walk, unit: 'min', label: 'to ' + st.name, icon: 'train' });
+    if (st && out.length < 4) out.push({ n: st.walk, unit: NS.t('min'), label: NS.t('to {place}', { place: st.name }), icon: 'train' });
     var total = places.filter(function (x) { return x.walk <= 15; }).length;
-    if (out.length < 4 && total) out.push({ n: total, unit: '', label: 'places within 15 minutes on foot', icon: 'pin' });
+    if (out.length < 4 && total) out.push({ n: total, unit: '', label: NS.t('places within 15 minutes on foot'), icon: 'pin' });
     return out.slice(0, 4);
   };
 
@@ -155,8 +155,12 @@
     transport: 'Transport link', essentials: 'Everyday essentials', culture: 'A stage for music and theatre'
   };
   NS.describe = function (p) {
-    if (p.note) return 'Our tip: ' + p.note;
+    if (p.note) return NS.t('Our tip: {note}', { note: NS.tr(p.note) });
     if (p.wiki && p.wiki.extract) return NS.firstSentence(p.wiki.extract, 180);
+    if (NS.lang !== 'en') {
+      var sub = p.sub ? String(p.sub).replace(/_/g, ' ') : '';
+      return NS.t(SUB[p.cat]) + (sub ? ' (' + sub + ')' : '') + '.' + (p.diet ? ' ' + NS.t('Plant-based dishes too.') : '');
+    }
     if (p.sub) {
       var s = String(p.sub).replace(/_/g, ' ');
       if (p.cat === 'restaurant' || p.cat === 'cafe') return s.charAt(0).toUpperCase() + s.slice(1) + ' ' + (p.cat === 'cafe' ? 'café' : 'kitchen') + (p.diet ? ', with plant-based dishes' : '') + '.';
@@ -182,7 +186,7 @@
   NS.story = function (data, pid, opts) {
     opts = opts || {};
     var p = NS.persona(pid) || NS.PERSONAS[0];
-    var hotel = data.hotel || {}, name = hotel.name || 'the hotel';
+    var hotel = data.hotel || {}, name = hotel.name || NS.t('the hotel');
     var nights = Math.max(1, Math.min(5, +opts.nights || p.nights || 2));
     var season = opts.season || p.season || NS.season(opts.date);
     var R = RHYTHM[p.rhythm] || RHYTHM.normal;
@@ -221,7 +225,7 @@
     }
     function verb(pl) {
       var vs = NS.CATS[pl.cat].verbs;
-      return vs[Math.floor(rnd() * vs.length)].replace('{n}', pl.name);
+      return NS.t(vs[Math.floor(rnd() * vs.length)]).replace('{n}', pl.name);
     }
     function placeSlot(time, pl, extra, title) {
       return { time: time, cat: pl.cat, icon: NS.CATS[pl.cat].icon, title: title || verb(pl), text: NS.describe(pl) + (extra ? ' ' + extra : ''),
@@ -237,14 +241,14 @@
     var breakfastIncluded = NS.hasFeature(data, 'breakfast');
 
     var flavour = {
-      winter: 'Wrap up warm: the old town glows in the snow.', summer: 'Evenings stay light until late, so take your time.',
-      spring: 'Café terraces start opening in spring.', autumn: 'Golden trees and fewer crowds.'
+      winter: NS.t('Wrap up warm: the old town glows in the snow.'), summer: NS.t('Evenings stay light until late, so take your time.'),
+      spring: NS.t('Café terraces start opening in spring.'), autumn: NS.t('Golden trees and fewer crowds.')
     };
 
     function breakfast(time) {
-      if (breakfastIncluded) return hotelSlot(time, 'cup', 'Breakfast at ' + name, hotel.breakfast || 'Breakfast is included and served downstairs.');
+      if (breakfastIncluded) return hotelSlot(time, 'cup', NS.t('Breakfast at {hotel}', { hotel: name }), NS.tr(hotel.breakfast) || NS.t('Breakfast is included and served downstairs.'));
       var c = pick(['cafe'], 8);
-      return c ? placeSlot(time, c, 'A good start to the day.') : hotelSlot(time, 'cup', 'Breakfast nearby', 'Ask at the desk for our favourite breakfast spot.');
+      return c ? placeSlot(time, c, NS.t('A good start to the day.')) : hotelSlot(time, 'cup', NS.t('Breakfast nearby'), NS.t('Ask at the desk for our favourite breakfast spot.'));
     }
     function activity(time, k, dayIndex, maxWalk) {
       for (var t = 0; t < activityCats.length; t++) {
@@ -253,86 +257,86 @@
         if (pl) return placeSlot(time, pl);
       }
       var any = pick(activityCats);
-      return any ? placeSlot(time, any) : hotelSlot(time, 'walk', 'Wander the neighbourhood', 'Pick a street you have not walked yet. Everything here is close.');
+      return any ? placeSlot(time, any) : hotelSlot(time, 'walk', NS.t('Wander the neighbourhood'), NS.t('Pick a street you have not walked yet. Everything here is close.'));
     }
     function meal(time, cats, label) {
       var pl = pick(cats, 15 * pace);
-      if (!pl) return hotelSlot(time, 'fork', label, 'Ask us for a table nearby. We know the good ones.');
-      return placeSlot(time, pl, '', (pl.cat === 'market' ? 'Pick up lunch at ' : label + ' at ') + pl.name);
+      if (!pl) return hotelSlot(time, 'fork', NS.t(label), NS.t('Ask us for a table nearby. We know the good ones.'));
+      return placeSlot(time, pl, '', NS.t(pl.cat === 'market' ? 'Pick up lunch at {place}' : label + ' at {place}', { place: pl.name }));
     }
     function evening(time) {
       if (p.rhythm === 'late' || w.bar >= 2 || w.nightlife >= 2) {
         var b = pick(['bar', 'nightlife'], 15);
-        if (b) return placeSlot(time, b, '', (b.cat === 'nightlife' ? 'Late night at ' : rnd() < 0.5 ? 'Nightcap at ' : 'Drinks at ') + b.name);
+        if (b) return placeSlot(time, b, '', NS.t(b.cat === 'nightlife' ? 'Late night at {place}' : rnd() < 0.5 ? 'Nightcap at {place}' : 'Drinks at {place}', { place: b.name }));
       }
-      if (NS.hasFeature(data, 'fireplace')) return hotelSlot(time, 'fire', 'Back by the fireplace', 'End the day with a book by the lobby fire.');
+      if (NS.hasFeature(data, 'fireplace')) return hotelSlot(time, 'fire', NS.t('Back by the fireplace'), NS.t('End the day with a book by the lobby fire.'));
       var s = pick(['sight', 'church', 'park'], 10);
-      return s ? placeSlot(time, s, 'Beautiful after dark, too.') : hotelSlot(time, 'moon', 'An early night', 'Sleep well: tomorrow there is more to see.');
+      return s ? placeSlot(time, s, NS.t('Beautiful after dark, too.')) : hotelSlot(time, 'moon', NS.t('An early night'), NS.t('Sleep well: tomorrow there is more to see.'));
     }
 
     var days = [];
     // Arrival
     var arrive = hotel.checkin || '15:00';
-    var d0 = [hotelSlot(arrive, 'key', 'Check in at ' + name, (hotel.checkin_note || 'Drop your bags, freshen up and pick up a map at the desk.'))];
+    var d0 = [hotelSlot(arrive, 'key', NS.t('Check in at {hotel}', { hotel: name }), (NS.tr(hotel.checkin_note) || NS.t('Drop your bags, freshen up and pick up a map at the desk.')))];
     var first = activity(addMinutes(arrive, 60), 0, 0, 8);
-    first.title = 'First walk: ' + first.title.charAt(0).toLowerCase() + first.title.slice(1);
+    first.title = NS.t('First walk: {what}', { what: NS.lcFirst(first.title) });
     d0.push(first);
-    if (p.rhythm === 'late' || w.bar >= 1.5) { var ap = pick(['bar'], 10); if (ap) d0.push(placeSlot(R.evening, ap, 'To start the trip.', 'An aperitif at ' + ap.name)); }
+    if (p.rhythm === 'late' || w.bar >= 1.5) { var ap = pick(['bar'], 10); if (ap) d0.push(placeSlot(R.evening, ap, NS.t('To start the trip.'), NS.t('An aperitif at {place}', { place: ap.name }))); }
     if (inHouse && (w.restaurant >= 1 || nights === 1)) {
-      d0.push(hotelSlot(R.dinner, 'fork', 'Dinner downstairs at ' + data.dining.name,
-        NS.firstSentence(data.dining.short || data.dining.body || 'No need to go far on your first night.', 170)));
+      d0.push(hotelSlot(R.dinner, 'fork', NS.t('Dinner downstairs at {place}', { place: data.dining.name }),
+        NS.firstSentence(NS.tr(data.dining.short) || NS.tr(data.dining.body) || NS.t('No need to go far on your first night.'), 170)));
     } else d0.push(meal(R.dinner, mealCats, 'Dinner'));
     d0.push(evening(R.night));
-    days.push({ title: 'Arrival', slots: d0 });
+    days.push({ title: NS.t('Arrival'), slots: d0 });
 
     // Full days
     for (var d = 1; d < nights; d++) {
       var s = [breakfast(R.breakfast)];
-      if (p.id === 'runner' || w.sport >= 2) { var run = pick(['park', 'sport'], 15); if (run) s.unshift(placeSlot(addMinutes(R.breakfast, -60), run, 'Before breakfast, while the streets are quiet.')); }
-      if (w.coworking >= 2) { var cw = pick(['coworking', 'cafe'], 15); if (cw) s.push(placeSlot(R.morning, cw, 'Fast Wi-Fi and good coffee.')); }
+      if (p.id === 'runner' || w.sport >= 2) { var run = pick(['park', 'sport'], 15); if (run) s.unshift(placeSlot(addMinutes(R.breakfast, -60), run, NS.t('Before breakfast, while the streets are quiet.'))); }
+      if (w.coworking >= 2) { var cw = pick(['coworking', 'cafe'], 15); if (cw) s.push(placeSlot(R.morning, cw, NS.t('Fast Wi-Fi and good coffee.'))); }
       else s.push(activity(R.morning, 0, d));
       if (p.rhythm === 'early') s.push(activity(R.late, 1, d));
       s.push(meal(R.lunch, lunchCats, 'Lunch'));
       s.push(activity(R.afternoon, 2, d));
       var cf = pick(season === 'summer' && w.park ? ['park', 'cafe'] : (w.wellness >= 2 ? ['wellness', 'cafe'] : ['cafe']), 10);
-      if (cf) s.push(placeSlot(R.coffee, cf, season === 'winter' ? 'Warm up for a while.' : ''));
+      if (cf) s.push(placeSlot(R.coffee, cf, season === 'winter' ? NS.t('Warm up for a while.') : ''));
       if (w.shop >= 2) { var sh = pick(['shop', 'market'], 12); if (sh) s.push(placeSlot(R.evening, sh)); }
       var perf = w.culture >= 1.5 ? pick(['culture'], 20) : null;
       if (perf) {
-        s.push(placeSlot('19:00', perf, 'Check what is on tonight: most performances start around 19:00.', 'An evening performance at ' + perf.name));
+        s.push(placeSlot('19:00', perf, NS.t('Check what is on tonight: most performances start around 19:00.'), NS.t('An evening performance at {place}', { place: perf.name })));
         var sup = pick(['restaurant', 'bar'], 12);
-        if (sup) s.push(placeSlot('21:45', sup, 'A late supper after the show.', 'Late supper at ' + sup.name));
+        if (sup) s.push(placeSlot('21:45', sup, NS.t('A late supper after the show.'), NS.t('Late supper at {place}', { place: sup.name })));
       } else {
         s.push(meal(R.dinner, mealCats, 'Dinner'));
         s.push(evening(R.night));
       }
       if (R.late_night && (w.nightlife >= 2)) { var nl = pick(['nightlife', 'bar'], 15); if (nl) s.push(placeSlot(R.late_night, nl)); }
-      days.push({ title: 'Day ' + (d + 1), slots: s });
+      days.push({ title: NS.t('Day {n}', { n: d + 1 }), slots: s });
     }
 
     // Departure
     var out = hotel.checkout || '12:00';
     var dl = [breakfast(R.breakfast)];
     var last = pick(activityCats.slice(0, 3).concat(['cafe']), 8);
-    if (last) dl.push(placeSlot(addMinutes(out, -90), last, 'One last look before you go.'));
-    dl.push(hotelSlot(out, 'suitcase', 'Check out', NS.hasFeature(data, 'luggage') ? 'Leave your bags with us and enjoy the rest of the day.' : 'Thank you for staying with us.'));
+    if (last) dl.push(placeSlot(addMinutes(out, -90), last, NS.t('One last look before you go.')));
+    dl.push(hotelSlot(out, 'suitcase', NS.t('Check out'), NS.hasFeature(data, 'luggage') ? NS.t('Leave your bags with us and enjoy the rest of the day.') : NS.t('Thank you for staying with us.')));
     var station = NS.nearest(places, 'transport', function (x) { return /station|stacija|terminal|bus|airport/i.test(x.name + ' ' + (x.sub || '')); });
-    if (station) dl.push(placeSlot(addMinutes(out, 60), station, hotel.airport ? hotel.airport : ''));
-    else if (hotel.airport) dl.push(hotelSlot(addMinutes(out, 60), 'plane', 'To the airport', hotel.airport));
-    days.push({ title: 'Departure', slots: dl });
+    if (station) dl.push(placeSlot(addMinutes(out, 60), station, hotel.airport ? NS.tr(hotel.airport) : ''));
+    else if (hotel.airport) dl.push(hotelSlot(addMinutes(out, 60), 'plane', NS.t('To the airport'), NS.tr(hotel.airport)));
+    days.push({ title: NS.t('Departure'), slots: dl });
 
     // Intro, tips and rooms
     var landmark = places.filter(function (x) { return x.cat === 'sight' && x.wiki; })[0] || places.filter(function (x) { return w[x.cat] > 0; })[0];
     var top2 = activityCats.concat(['cafe', 'restaurant', 'bar']).filter(function (c, i, a) { return a.indexOf(c) === i && w[c] > 0; }).slice(0, 2);
     var counts = top2.map(function (c) { return { c: c, n: NS.countWithin(places, c, 10) }; }).filter(function (x) { return x.n > 0; });
-    var intro = ov.intro || (p.hook + ' ' + (landmark ? name + ' is ' + NS.fmtWalk(landmark.walk) + ' from ' + landmark.name +
-      (counts.length ? ', with ' + counts.map(function (x) { return x.n + ' ' + NS.CATS[x.c].plural; }).join(' and ') + ' within ten minutes on foot.' : '.') : ''));
+    var intro = NS.tr(ov.intro) || (NS.t(p.hook) + ' ' + (landmark ? NS.t('{hotel} is {walk} from {place}', { hotel: name, walk: NS.fmtWalk(landmark.walk), place: landmark.name }) +
+      (counts.length ? NS.t(', with {list} within ten minutes on foot.', { list: counts.map(function (x) { return NS.t('{n} {things}', { n: x.n, things: NS.t(NS.CATS[x.c].plural) }); }).join(NS.t(' and ')) }) : '.') : ''));
     var tips = [];
     (p.perks || []).forEach(function (k) {
       if (k === 'location' || !NS.hasFeature(data, k)) return;
-      tips.push({ icon: NS.FEATURES[k].icon, text: NS.FEATURES[k].label });
+      tips.push({ icon: NS.FEATURES[k].icon, text: NS.t(NS.FEATURES[k].label) });
     });
-    if (ov.tip) tips.unshift({ icon: 'sparkle', text: ov.tip, own: true });
+    if (ov.tip) tips.unshift({ icon: 'sparkle', text: NS.tr(ov.tip), own: true });
     tips.push({ icon: season === 'winter' ? 'snow' : season === 'summer' ? 'sun' : 'leaf', text: flavour[season] });
 
     var rooms = NS.roomsFor(data, p);
@@ -359,34 +363,34 @@
     story: function (data) {
       var h = data.hotel || {}, places = NS.places(data);
       var lm = places.filter(function (x) { return x.cat === 'sight' && x.wiki; }).slice(0, 2);
-      return 'Welcome to ' + (h.name || 'our hotel') + (h.area ? ', in the heart of ' + h.area : '') + '. ' +
-        (h.building ? h.building + ' ' : '') +
-        (lm.length ? 'From our door it is ' + lm.map(function (x) { return NS.fmtWalk(x.walk) + ' to ' + x.name; }).join(' and ') + '. ' : '') +
-        'We are a small, personal hotel: we know our guests by name, and we love sharing the places we go ourselves.';
+      return NS.t('Welcome to {hotel}', { hotel: h.name || NS.t('our hotel') }) + (h.area ? NS.t(', in the heart of {area}', { area: h.area }) : '') + '. ' +
+        (h.building ? NS.tr(h.building) + ' ' : '') +
+        (lm.length ? NS.t('From our door it is {list}. ', { list: lm.map(function (x) { return NS.t('{walk} to {place}', { walk: NS.fmtWalk(x.walk), place: x.name }); }).join(NS.t(' and ')) }) : '') +
+        NS.t('We are a small, personal hotel: we know our guests by name, and we love sharing the places we go ourselves.');
     },
     neighborhood: function (data) {
       var h = data.hotel || {}, places = NS.places(data);
       var n15 = places.filter(function (x) { return x.walk <= 15; }).length;
       var cafes = NS.countWithin(places, 'cafe', 10), rest = NS.countWithin(places, 'restaurant', 10), mus = NS.countWithin(places, 'museum', 15);
-      return 'Step outside and ' + (h.area || 'the city') + ' is yours: ' + n15 + ' places within a fifteen-minute walk, including ' +
-        cafes + ' cafés and ' + rest + ' restaurants within ten minutes' + (mus ? ', and ' + mus + ' museums' : '') + '. Leave the car; you will not need it.';
+      return NS.t('Step outside and {area} is yours: {n} places within a fifteen-minute walk, including {cafes} cafés and {rest} restaurants within ten minutes',
+        { area: h.area || NS.t('the city'), n: n15, cafes: cafes, rest: rest }) + (mus ? NS.t(', and {mus} museums', { mus: mus }) : '') + NS.t('. Leave the car; you will not need it.');
     },
     highlights: function (data) {
       var feats = NS.get(data, 'hotel.features', []) || [];
       var out = [];
       var nums = NS.numbers(data);
-      if (nums[0]) out.push({ icon: 'walk', title: nums[0].n + ' minutes ' + nums[0].label.replace(/^on foot /, 'on foot '), text: 'Right in the middle of everything, on a quiet street.' });
-      feats.slice(0, 5).forEach(function (k) { if (NS.FEATURES[k]) out.push({ icon: NS.FEATURES[k].icon, title: NS.FEATURES[k].label, text: '' }); });
+      if (nums[0]) out.push({ icon: 'walk', title: NS.t('{n} minutes {label}', { n: nums[0].n, label: nums[0].label }), text: NS.t('Right in the middle of everything, on a quiet street.') });
+      feats.slice(0, 5).forEach(function (k) { if (NS.FEATURES[k]) out.push({ icon: NS.FEATURES[k].icon, title: NS.t(NS.FEATURES[k].label), text: '' }); });
       return out.slice(0, 6);
     },
     faq: function (data) {
       var h = data.hotel || {}, b = data.booking || {};
       var out = [];
-      if (h.checkin || h.checkout) out.push({ q: 'What time is check-in and check-out?', a: 'Check-in is from ' + (h.checkin || '15:00') + ' and check-out is until ' + (h.checkout || '12:00') + '.' });
-      if (NS.hasFeature(data, 'breakfast')) out.push({ q: 'Is breakfast included?', a: h.breakfast || 'Yes, breakfast is included.' });
-      if (NS.get(b, 'payment.when')) out.push({ q: 'When do I pay?', a: b.payment.when });
-      if (h.parking) out.push({ q: 'Is there parking?', a: h.parking });
-      if (h.airport) out.push({ q: 'How do I get here from the airport?', a: h.airport });
+      if (h.checkin || h.checkout) out.push({ q: NS.t('What time is check-in and check-out?'), a: NS.t('Check-in is from {in} and check-out is until {out}.', { 'in': h.checkin || '15:00', out: h.checkout || '12:00' }) });
+      if (NS.hasFeature(data, 'breakfast')) out.push({ q: NS.t('Is breakfast included?'), a: NS.tr(h.breakfast) || NS.t('Yes, breakfast is included.') });
+      if (NS.get(b, 'payment.when')) out.push({ q: NS.t('When do I pay?'), a: NS.tr(b.payment.when) });
+      if (h.parking) out.push({ q: NS.t('Is there parking?'), a: NS.tr(h.parking) });
+      if (h.airport) out.push({ q: NS.t('How do I get here from the airport?'), a: NS.tr(h.airport) });
       return out;
     }
   };

@@ -1,0 +1,11 @@
+<div class="ui dlg">
+  <h2 class="dlg-h">Add to your FAQ</h2>
+  <p class="muted">The question and your answer go into the site's "Questions guests ask" section, so the next guest doesn't need to ask. Publish the site to show it.</p>
+  <label class="ui-field"><span>Question (as it will show)</span><anvil-component type="TextBox" name="q_box"></anvil-component></label>
+  <label class="ui-field"><span>Your answer</span><anvil-component type="TextArea" name="a_box" prop:height="140"></anvil-component></label>
+  <anvil-component type="Label" name="hint" prop:text="Tip: also translate it in the editor's Languages tab, so guests reading in Latvian, Russian or German see it too." prop:role='["fine-print"]'></anvil-component>
+  <div class="ui-row end">
+    <anvil-component type="Button" name="cancel_button" prop:text="Cancel" prop:role='["btn", "btn-ghost"]'></anvil-component>
+    <anvil-component type="Button" name="ok_button" prop:text="Add to FAQ" prop:role='["btn", "btn-primary"]'></anvil-component>
+  </div>
+</div>

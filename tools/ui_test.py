@@ -6,6 +6,8 @@
     python -I tools/ui_test.py --stop          stop the local server afterwards
     python -I tools/ui_test.py --only smoke.js one script (smoke.js, flow.js, phone.js, admin.js, a11y.js or design.js)
                                                smoke.js = every page address, signed out / member / admin, no errors
+                                               features.js = languages tab + preview, the guest question form on the
+                                               hosted site -> #questions inbox, the reception QR card
                                                design.js = the rendered design check (APP_MAKER/design), desktop + phone:
                                                eyebrows, gradient text, invisible content, sideways scroll fail; tiny text,
                                                long lines, small touch targets, transition: all are warnings to fix
@@ -127,7 +129,7 @@ def main():
     out = pathlib.Path(tempfile.mkdtemp(prefix=KEY + "-ui-"))
     failed = False
     only = args[args.index("--only") + 1] if "--only" in args else None  # e.g. --only a11y.js
-    for script, window in (("smoke.js", "1280,1000"), ("flow.js", "1280,1000"), ("phone.js", "390,844"), ("admin.js", "1280,1000"), ("a11y.js", "1280,1000"),
+    for script, window in (("smoke.js", "1280,1000"), ("features.js", "1280,1000"), ("flow.js", "1280,1000"), ("phone.js", "390,844"), ("admin.js", "1280,1000"), ("a11y.js", "1280,1000"),
                            ("design.js", "1280,1000"), ("design.js", "390,844")):
         if only and script != only:
             continue

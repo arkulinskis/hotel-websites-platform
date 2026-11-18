@@ -173,6 +173,10 @@ conflict = call("save_site", sid, data, 1)
 assert conflict["ok"] is False and conflict.get("conflict"), "an older version can't overwrite a newer one"
 bad(call("save_site", sid, {"x": "y" * 20000, "places": ["y" * 20000] * 60}, 2), "too big")
 bad(call("save_site", sid, "not a dict", 2))
+long_en = "We are a small family hotel in the old town, and we love sharing our favourite places with every guest."
+kept = M["Sites"].clean_data({"i18n": {"lv": {long_en: "Mēs esam neliela ģimenes viesnīca."}}, "x" * 80: 1})
+assert kept["i18n"]["lv"][long_en] == "Mēs esam neliela ģimenes viesnīca.", "translation keys (the English text) are not cut"
+assert ("x" * 60) in kept and ("x" * 80) not in kept, "other keys still are"
 
 as_user(bob)
 bad(call("get_site", sid), "someone else's site")
@@ -218,6 +222,90 @@ H.hit(s="nope", e="view")
 assert H.hit(s="rose-hotel", e="weird").status == 200
 st_ = ok(call("site_stats", sid, 30))
 assert st_["total"] == 3 and st_["all_time"] == 3 and st_["personas"] == [{"id": "foodie", "n": 1}] and len(st_["days"]) == 30
+# ---------------------------------------------------------------------------------- languages on the hosted page
+row_ = T.sites.get_by_id(sid)
+live_ = dict(row_["live"]); live_["hotel"] = dict(live_["hotel"], name="Hotel Rose")
+live_["langs"] = ["lv", "de", "xx"]
+live_["seo"] = {"title": "Hotel Rose in Riga"}
+live_["i18n"] = {"lv": {"Hotel Rose in Riga": "Viesnīca Rose Rīgā"}}
+row_["live"] = live_
+en_page = H.hosted(slug="rose-hotel").body
+assert '<html lang="en">' in en_page and 'hreflang="lv"' in en_page and 'hreflang="de"' in en_page and 'hreflang="x-default"' in en_page
+assert 'hreflang="ru"' not in en_page and "xx" not in en_page.split("<body>")[0], "only the languages the owner switched on"
+lv_page = H.hosted(slug="rose-hotel", lang="lv").body
+assert '<html lang="lv">' in lv_page and "<title>Viesnīca Rose Rīgā</title>" in lv_page and '"lang":"lv"' in lv_page
+assert 'rel="canonical" href="' in lv_page and "?lang=lv" in lv_page
+assert '<html lang="en">' in H.hosted(slug="rose-hotel", lang="ru").body, "a language the site doesn't offer falls back to English"
+assert '"ask":' in en_page, "the page knows where to send guest questions"
+
+# ---------------------------------------------------------------------------------- guest questions (the form on the site)
+import anvil.email  # noqa: E402
+G = M["GuestQuestions"]
+anvil.email.OUTBOX.clear()
+q = {"s": "rose-hotel", "name": "Marta", "email": "Marta@Example.com", "message": "Do you have a cot for a baby?", "lang": "lv", "persona": "family", "t": 9000}
+assert G.accept(q) == (200, {"ok": True})
+row = T.guest_questions.get(email="marta@example.com")
+assert row["status"] == "new" and row["lang"] == "lv" and row["persona"] == "family" and row["site"]["slug"] == "rose-hotel"
+assert len(anvil.email.OUTBOX) == 1 and anvil.email.OUTBOX[0]["to"] == "ana@example.com", "the owner gets an email"
+assert "marta@example.com" in anvil.email.OUTBOX[0]["text"]
+assert row["notified"] is True
+assert G.accept(dict(q, message="And a high chair at breakfast?")) == (200, {"ok": True})
+assert len(anvil.email.OUTBOX) == 1, "at most one email per site every 30 minutes"
+assert G.accept(q) == (200, {"ok": True}) and len(T.guest_questions.search(email="marta@example.com")) == 2, "pressing twice stores it once"
+assert G.accept(dict(q, hp="http://spam"))[0] == 200 and len(T.guest_questions.search()) == 2, "the honeypot drops bots quietly"
+assert G.accept(dict(q, t=300, message="Too fast to be a person"))[0] == 200 and len(T.guest_questions.search()) == 2
+assert G.accept(dict(q, email="not-an-email")) == (400, {"ok": False, "error": "email"})
+assert G.accept(dict(q, message="hi")) == (400, {"ok": False, "error": "message"})
+assert G.accept(dict(q, s="nope"))[0] == 404
+assert G.accept("junk")[0] == 400
+assert G.accept(dict(q, lang="xx", persona="<b>", message="Weird fields"))[0] == 200
+weird = T.guest_questions.get(message="Weird fields")
+assert weird["lang"] == "en" and weird["persona"] == ""
+live_ = dict(row_["live"]); live_["contact"] = {"ask_off": True}; row_["live"] = live_
+assert G.accept(dict(q, message="Is the form off?"))[0] == 403, "an owner can switch the form off"
+live_ = dict(row_["live"]); live_["contact"] = {}; row_["live"] = live_
+anvil.server.request.body = '{"s": "rose-hotel", "name": "Jonas", "email": "jonas@example.com", "message": "Late check-in possible?", "t": 5000}'
+resp = G.ask()
+assert resp.status == 200 and json.loads(resp.body)["ok"] and resp.headers["Access-Control-Allow-Origin"] == "*"
+anvil.server.request.body = "not json"
+assert G.ask().status == 400
+for i in range(30):
+    G.accept(dict(q, message="Flood question number %d" % i))
+assert G.accept(dict(q, message="One more after the flood"))[0] == 429, "a site takes at most 20 questions an hour"
+for r_ in [x for x in T.guest_questions.search() if x["message"].startswith("Flood")]:
+    r_.delete()
+
+# ---------------------------------------------------------------------------------- guest questions (the owner's inbox)
+as_user(None)
+assert denied("my_questions") and denied("set_question_status", "x", "new") and denied("delete_question", "x") and denied("question_to_faq", "x", "q", "a")
+as_user(bob)
+assert call("my_questions")["items"] == [], "other people don't see the questions"
+bad(call("set_question_status", row.get_id(), "answered"))
+bad(call("delete_question", row.get_id()))
+bad(call("question_to_faq", row.get_id(), "Q?", "A."))
+as_user(ana)
+assert call("get_me")["questions_new"] == 4
+inbox = call("my_questions", "new")
+assert inbox["counts"]["new"] == 4 and len(inbox["items"]) == 4
+assert [i["created"] for i in inbox["items"]] == sorted([i["created"] for i in inbox["items"]], reverse=True), "newest first"
+assert inbox["sites"][0]["name"] == "Hotel Rose" and inbox["items"][0]["site_name"] == "Hotel Rose"
+assert call("my_sites")["sites"][0]["questions_new"] == 4 and call("my_sites")["questions_new"] == 4
+ok(call("set_question_status", row.get_id(), "answered"))
+assert row["status"] == "answered" and row["answered_at"] is not None
+bad(call("set_question_status", row.get_id(), "weird"))
+bad(call("set_question_status", "nope", "answered"))
+assert call("my_questions", "answered")["counts"]["answered"] == 1
+version_before = T.sites.get_by_id(sid)["version"]
+bad(call("question_to_faq", weird.get_id(), "Q", ""), "needs an answer")
+f = ok(call("question_to_faq", weird.get_id(), "Can I bring a dog?", "Yes, small dogs are welcome."))
+srow = T.sites.get_by_id(sid)
+assert srow["data"]["faq"][-1] == {"q": "Can I bring a dog?", "a": "Yes, small dogs are welcome."} and srow["version"] == version_before + 1
+assert weird["status"] == "answered"
+ok(call("delete_question", weird.get_id()))
+assert T.guest_questions.get(message="Weird fields") is None
+as_user(admin)
+assert call("my_questions")["counts"]["new"] >= 1, "admins see questions to every real site"
+
 ok(call("unpublish_site", sid))
 assert H.hosted(slug="rose-hotel").status == 404, "unpublished sites aren't served"
 H.hit(s="rose-hotel", e="view")

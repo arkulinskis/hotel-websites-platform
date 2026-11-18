@@ -15,7 +15,8 @@ def _loose(x):
 
 
 class PublishPanel(PublishPanelTemplate):
-    """The editor's Publish tab: the address (check_slug as you type), publish / unpublish / copy, the visits chart
+    """The editor's Publish tab: the address (check_slug as you type), publish / unpublish / copy, the reception QR card
+    (Dialogs/QrCard), the visits chart
     (site_stats, drawn by NSEd.statsHtml), search-engine texts (seo.* in the site JSON), downloads (NSApp.exportSite),
     duplicate and delete. setup(page) links it to the Edit page (site, ed engine, save())."""
 
@@ -44,6 +45,8 @@ class PublishPanel(PublishPanelTemplate):
             self.dom_nodes["live_text"].textContent = " " + ns.short_url(site.get("url"))
         self.publish_button.text = ("Publish my changes" if site.get("unpublished_changes") else "Publish again") if live else "Publish my site"
         self.copy_button.visible = self.unpublish_button.visible = live
+        self.qr_button.enabled = live
+        self.qr_note.visible = not live
         self.pending_note.visible = bool(live and site.get("unpublished_changes"))
         hotel_name = p.ed.get("hotel.name")
         self.seo_title.placeholder = "%s · %s" % (hotel_name, p.ed.get("hotel.city"))
@@ -108,6 +111,13 @@ class PublishPanel(PublishPanelTemplate):
     @handle("copy_button", "click")
     def copy_button_click(self, **event_args):
         ns.copy_text(self.page.site.get("url") or "")
+
+    @handle("qr_button", "click")
+    def qr_button_click(self, **event_args):
+        p = self.page
+        from ...Dialogs.QrCard import QrCard
+        alert(QrCard(data_json=p.ed.dataJson(), url=p.site.get("url") or "", site_id=p.site_id), buttons=[], large=True,
+              role="app-dialog", dismissible=True)
 
     # ---------------------------------------------------------------- search engines
     @handle("seo_title", "change")

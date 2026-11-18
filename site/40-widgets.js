@@ -42,7 +42,7 @@
   NS.Modal = function (html) {
     var wrap = document.createElement('div');
     wrap.className = 'ns-modal';
-    wrap.innerHTML = '<div class="ns-modal-box" role="dialog" aria-modal="true"><button class="ns-x" data-x aria-label="Close">' + ic('x') + '</button>' + html + '</div>';
+    wrap.innerHTML = '<div class="ns-modal-box" role="dialog" aria-modal="true"><button class="ns-x" data-x aria-label="' + e(NS.t('Close')) + '">' + ic('x') + '</button>' + html + '</div>';
     (document.querySelector('.ns') || document.body).appendChild(wrap);
     var api = { el: wrap, onclose: null, close: close };
     function key(ev) { if (ev.key === 'Escape') close(); }
@@ -59,8 +59,8 @@
   NS.Lightbox = function (items, start) {
     if (!items.length) return null;
     var i = start || 0;
-    var m = NS.Modal('<div class="ns-lb"><img alt=""><p class="ns-lb-cap"></p><button class="ns-lb-btn prev" data-lb-go="-1" aria-label="Previous">' + ic('left') +
-      '</button><button class="ns-lb-btn next" data-lb-go="1" aria-label="Next">' + ic('right') + '</button><span class="ns-lb-n"></span></div>');
+    var m = NS.Modal('<div class="ns-lb"><img alt=""><p class="ns-lb-cap"></p><button class="ns-lb-btn prev" data-lb-go="-1" aria-label="' + e(NS.t('Previous')) + '">' + ic('left') +
+      '</button><button class="ns-lb-btn next" data-lb-go="1" aria-label="' + e(NS.t('Next')) + '">' + ic('right') + '</button><span class="ns-lb-n"></span></div>');
     m.el.classList.add('dark');
     var img = m.el.querySelector('img'), cap = m.el.querySelector('.ns-lb-cap'), n = m.el.querySelector('.ns-lb-n');
     function show() { var it = items[(i + items.length) % items.length]; img.src = it.src; cap.textContent = it.caption || ''; n.textContent = ((i + items.length) % items.length + 1) + ' / ' + items.length; }
@@ -148,7 +148,7 @@
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       state.ready = true; el.classList.add('ready');
     };
-    img.onerror = function () { el.classList.add('error'); el.insertAdjacentHTML('beforeend', '<p class="ns-pano-err">This 360° photo could not be loaded.</p>'); };
+    img.onerror = function () { el.classList.add('error'); el.insertAdjacentHTML('beforeend', '<p class="ns-pano-err">' + e(NS.t('This 360° photo could not be loaded.')) + '</p>'); };
     img.src = src;
     var raf = 0, last = 0;
     function frame(t) {
@@ -212,7 +212,7 @@
   }
   function popupHtml(p) {
     return '<div class="ns-pop">' + (p.wiki && p.wiki.thumb ? '<img src="' + e(p.wiki.thumb) + '" alt="">' : '') + '<b>' + e(p.name) + '</b><span>' + e(NS.CATS[p.cat].label) + ' · ' + e(NS.fmtWalk(p.walk)) + '</span>' +
-      (p.note ? '<em>' + e(p.note) + '</em>' : '') + '<a href="' + e(NS.mapsLink(p)) + '" target="_blank" rel="noopener">Open in Google Maps</a></div>';
+      (p.note ? '<em>' + e(p.note) + '</em>' : '') + '<a href="' + e(NS.mapsLink(p)) + '" target="_blank" rel="noopener">' + e(NS.t('Open in Google Maps')) + '</a></div>';
   }
 
   NS.Map = function (el, o) {
@@ -342,7 +342,7 @@
         el.classList.add('ready');
         map.addSource('ns-rings', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({ id: 'ns-rings', type: 'line', source: 'ns-rings', paint: { 'line-color': palette.c.accent, 'line-width': 1.6, 'line-dasharray': [2, 2], 'line-opacity': 0.9 } });
-        map.addLayer({ id: 'ns-rings-l', type: 'symbol', source: 'ns-rings', layout: { 'symbol-placement': 'line', 'text-field': ['concat', ['to-string', ['get', 'm']], ' min'], 'text-size': 11,
+        map.addLayer({ id: 'ns-rings-l', type: 'symbol', source: 'ns-rings', layout: { 'symbol-placement': 'line', 'text-field': ['concat', ['to-string', ['get', 'm']], ' ' + NS.t('min')], 'text-size': 11,
           'text-font': ['Noto Sans Regular'] }, paint: { 'text-color': palette.c.accent, 'text-halo-color': palette.dark ? '#000' : '#fff', 'text-halo-width': 1.2 } });
         map.addSource('ns-route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } } });
         map.addLayer({ id: 'ns-route', type: 'line', source: 'ns-route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': palette.c.brand, 'line-width': 4, 'line-opacity': 0.85 } });
@@ -376,20 +376,20 @@
     function draw() {
       var rings = [5, 10, 15].map(function (m) {
         var r = Math.sqrt(m / maxMin) * (W / 2 - 30);
-        return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r.toFixed(1) + '" class="rg"/><text x="' + cx + '" y="' + (cy - r + 14).toFixed(1) + '" class="rl">' + m + ' min</text>';
+        return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r.toFixed(1) + '" class="rg"/><text x="' + cx + '" y="' + (cy - r + 14).toFixed(1) + '" class="rl">' + m + ' ' + e(NS.t('min')) + '</text>';
       }).join('');
       var line = '';
       if (route && route.length) line = '<polyline class="rt" points="' + [[cx, cy]].concat(route.map(pos)).map(function (q) { return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' ') + '"/>';
       var dots = places.filter(function (p) { return p.lat != null && p.walk <= maxMin; }).slice(0, 140).map(function (p) {
         var q = pos(p), on = focusId != null && String(p.id) === String(focusId);
         return '<g class="pt' + (on ? ' on' : '') + '" data-pid="' + e(p.id) + '" transform="translate(' + q[0].toFixed(1) + ' ' + q[1].toFixed(1) + ')"><circle r="' + (on ? 9 : 6) + '" style="fill:' + NS.CATS[p.cat].color + '"/>' +
-          (on || p.wiki ? '<text x="10" y="4">' + e(p.name) + '</text>' : '') + '<title>' + e(p.name + ' · ' + p.walk + ' min') + '</title></g>';
+          (on || p.wiki ? '<text x="10" y="4">' + e(p.name) + '</text>' : '') + '<title>' + e(p.name + ' · ' + NS.t('{n} min', { n: p.walk })) + '</title></g>';
       }).join('');
-      el.innerHTML = '<svg class="ns-flat" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Map of places around the hotel">' +
+      el.innerHTML = '<svg class="ns-flat" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + e(NS.t('Map of places around the hotel')) + '">' +
         '<defs><radialGradient id="nsfg"><stop offset="0" class="g0"/><stop offset="1" class="g1"/></radialGradient></defs><rect width="' + W + '" height="' + H + '" fill="url(#nsfg)"/>' +
         rings + '<path class="cmp" d="M' + cx + ' 22l8 22h-16zM' + cx + ' 578l8-22h-16z"/><text x="' + cx + '" y="18" class="rl n">N</text>' + line + dots +
         '<g class="ht" transform="translate(' + cx + ' ' + cy + ')"><path d="M-14 16V-2a14 14 0 0 1 28 0v18z"/><text y="9">' + e((o.name || 'H').charAt(0)) + '</text></g></svg>' +
-        '<p class="ns-flat-note">Illustrated map: directions are true, distances are walking minutes.</p>';
+        '<p class="ns-flat-note">' + e(NS.t('Illustrated map: directions are true, distances are walking minutes.')) + '</p>';
     }
     el.addEventListener('click', function (ev) {
       var g = ev.target.closest('[data-pid]');

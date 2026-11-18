@@ -77,25 +77,51 @@ def structured_data(data, url, image):
     return {k: v for k, v in out.items() if v}
 
 
-def page_html(data, slug, app, api):
+LANGS = ("en", "lv", "ru", "de")
+LOCALES = {"en": "en_GB", "lv": "lv_LV", "ru": "ru_RU", "de": "de_DE"}
+
+
+def site_langs(data):
+    """English plus the languages the owner switched on (data.langs), in a fixed order."""
+    on = [x for x in (data.get("langs") or []) if isinstance(x, str)]
+    return [c for c in LANGS if c == "en" or c in on]
+
+
+def page_html(data, slug, app, api, lang="en"):
     h = data.get("hotel") or {}
     hero = data.get("hero") or {}
     seo = data.get("seo") or {}
+    langs = site_langs(data)
+    lang = lang if lang in langs else "en"
+    words = ((data.get("i18n") or {}).get(lang) or {}) if lang != "en" else {}
+
+    def tr(text):
+        """The owner's translation of one of their texts (keyed by the English), else the English."""
+        return (words.get(text) or text) if text else text
+
     name = h.get("name") or "Hotel"
-    title = seo.get("title") or ("%s · %s" % (name, h.get("city") or h.get("area") or "Hotel"))
-    desc = seo.get("description") or hero.get("headline") or h.get("tagline") or ("Stay at %s." % name)
+    title = tr(seo.get("title")) or ("%s · %s" % (name, h.get("city") or h.get("area") or "Hotel"))
+    desc = tr(seo.get("description") or hero.get("headline") or h.get("tagline")) or ("Stay at %s." % name)
     image = abs_media(hero.get("image") or ((data.get("gallery") or {}).get("items") or [{}])[0].get("src"), app, api)
-    url = "%s/s/%s" % (api, slug)
+    base = "%s/s/%s" % (api, slug)
+    url = base if lang == "en" else base + "?lang=" + lang
+    alternates = ""
+    if len(langs) > 1:
+        alternates = "".join('<link rel="alternate" hreflang="%s" href="%s">\n' % (c, base if c == "en" else base + "?lang=" + c) for c in langs)
+        alternates += '<link rel="alternate" hreflang="x-default" href="%s">\n' % base
+        alternates += '<meta property="og:locale" content="%s">\n' % LOCALES[lang]
     bg = BG.get((data.get("theme") or {}).get("palette") or "riga", "#f3ecdf")
     initial = (re.sub(r"^(hotel|boutique|the|villa|pension)\s+", "", name, flags=re.I).strip() or "H")[0].upper()
     icon = ("data:image/svg+xml," + "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%231f5c55'/%3E"
             "%3Ctext x='32' y='44' font-family='Georgia' font-size='34' text-anchor='middle' fill='%23e2b55c'%3E" + html.escape(initial) + "%3C/text%3E%3C/svg%3E")
     opts = {"mode": "live", "slug": slug, "media": {"m": api + "/m/", "a": app + "/_/theme/"}, "stats": api + "/hit",
-            "platform": {"name": PLATFORM, "url": app}}
+            "platform": {"name": PLATFORM, "url": app}, "ask": api + "/ask"}
+    if lang != "en":
+        opts["lang"] = lang
     esc = html.escape
     return ("<!doctype html>\n<html lang=\"%s\">\n<head>\n<meta charset=\"utf-8\">\n"
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n"
-            "<title>%s</title>\n<meta name=\"description\" content=\"%s\">\n<link rel=\"canonical\" href=\"%s\">\n"
+            "<title>%s</title>\n<meta name=\"description\" content=\"%s\">\n<link rel=\"canonical\" href=\"%s\">\n%s"
             "<meta property=\"og:type\" content=\"website\">\n<meta property=\"og:title\" content=\"%s\">\n<meta property=\"og:description\" content=\"%s\">\n"
             "<meta property=\"og:url\" content=\"%s\">\n%s<meta name=\"twitter:card\" content=\"summary_large_image\">\n<meta name=\"theme-color\" content=\"%s\">\n"
             "<link rel=\"icon\" href=\"%s\">\n<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n"
@@ -103,7 +129,7 @@ def page_html(data, slug, app, api):
             "<script type=\"application/ld+json\">%s</script>\n</head>\n<body>\n<div id=\"ns-root\"></div>\n"
             "<noscript><h1>%s</h1><p>%s</p><p>%s</p></noscript>\n"
             "<script src=\"%s/_/theme/ns-site.js?v=%s\"></script>\n<script>NSSite.boot(%s, %s);</script>\n</body>\n</html>\n") % (
-        esc(str(data.get("lang") or "en")), esc(title), esc(desc), esc(url), esc(title), esc(desc), esc(url),
+        esc(lang), esc(title), esc(desc), esc(url), alternates, esc(title), esc(desc), esc(url),
         ("<meta property=\"og:image\" content=\"%s\">\n" % esc(image)) if image else "", esc(bg), icon, app, SITE_V, bg,
         json_for_script(structured_data(data, url, image)), esc(name), esc(desc), esc(h.get("address") or ""),
         app, SITE_V, json_for_script(data), json_for_script(opts))
@@ -124,7 +150,8 @@ def hosted(slug, **kw):
     site = app_tables.sites.get(slug=str(slug or "").lower()[:60]) if slug else None
     if site is None or site["status"] != "published" or not site["live"]:
         return not_found(app)
-    return anvil.server.HttpResponse(200, page_html(site["live"], site["slug"], app, api),
+    lang = str(kw.get("lang") or "en").lower()[:2]
+    return anvil.server.HttpResponse(200, page_html(site["live"], site["slug"], app, api, lang),
                                      headers={"Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=60"})
 
 

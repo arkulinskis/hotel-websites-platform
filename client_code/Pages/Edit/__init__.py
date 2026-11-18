@@ -9,7 +9,7 @@ from ._anvil_designer import EditTemplate
 from ... import ns, router, state
 
 # (id, label, icon): the same tabs as ns-editor.js TABS; "publish" is Components/PublishPanel, the others NSEd panels
-TABS = [('start', 'Overview', 'grid'), ('basics', 'Hotel', 'home'), ('look', 'Look', 'sparkle'), ('texts', 'Texts', 'edit'), ('rooms', 'Rooms', 'bed'), ('media', 'Media', 'image'), ('area', 'Area', 'map'), ('guests', 'Guests', 'users'), ('booking', 'Booking', 'calendar'), ('publish', 'Publish', 'globe')]
+TABS = [('start', 'Overview', 'grid'), ('basics', 'Hotel', 'home'), ('look', 'Look', 'sparkle'), ('texts', 'Texts', 'edit'), ('rooms', 'Rooms', 'bed'), ('media', 'Media', 'image'), ('area', 'Area', 'map'), ('guests', 'Guests', 'users'), ('booking', 'Booking', 'calendar'), ('langs', 'Languages', 'lang'), ('publish', 'Publish', 'globe')]
 TAB_IDS = [t[0] for t in TABS]
 SECTION_TAB = {"hero": "look", "personas": "guests", "story": "texts", "highlights": "texts", "rooms": "rooms",
                "walkthrough": "media", "gallery": "media", "stay": "guests", "neighborhood": "area", "film": "media",
@@ -33,7 +33,7 @@ class Edit(EditTemplate):
     """#edit/<site id>[/<tab>]: the site editor, chrome-less. Top bar (back, title, save state, preview size, preview as,
     publish), the tab rail, the settings panel and the live preview.
 
-    The nine field tabs are the NSEd engine (theme/assets/ns-editor.js via Components/EditorPanel): every field is bound
+    The ten field tabs are the NSEd engine (theme/assets/ns-editor.js via Components/EditorPanel): every field is bound
     to a path in the site JSON, so this page only hears "changed" and autosaves (save_site with a version number, so two
     tabs can't overwrite each other silently). The Publish tab is Components/PublishPanel. Clicking "Edit" on a section of
     the preview (Components/SitePreview) opens the matching tab. Leaving the page saves what's left (leave())."""

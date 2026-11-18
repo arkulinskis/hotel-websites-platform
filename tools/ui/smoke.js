@@ -65,8 +65,8 @@
     if (!made || !made.id) throw new Error('create_site failed: ' + JSON.stringify(made));
     log.push('made site ' + made.id);
     window.NS_NO_MAP = true;
-    for (const h of ['#sites', '#new', '#profile', '#landing']) await check(h);
-    const tabs = ['start', 'basics', 'look', 'texts', 'rooms', 'media', 'area', 'guests', 'booking', 'publish'];
+    for (const h of ['#sites', '#new', '#profile', '#questions', '#questions/all', '#landing']) await check(h);
+    const tabs = ['start', 'basics', 'look', 'texts', 'rooms', 'media', 'area', 'guests', 'booking', 'langs', 'publish'];
     for (const t of tabs) await check('#edit/' + encodeURIComponent(made.id) + '/' + t, () => $('.ed-tab.on'), 60);
     await check('#edit/no-such-site', null, 20);
     await check('#sites');

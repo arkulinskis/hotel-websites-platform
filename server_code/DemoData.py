@@ -17,7 +17,7 @@ from . import common as C
 
 DEMO_USERS = [("Līga Ozola", "liga.demo@example.com"), ("Mårten Kask", "marten.demo@example.com")]
 # Tables that hold demo rows (each has an is_demo column). Children before parents.
-DEMO_TABLES = ["site_stats", "media", "sites"]
+DEMO_TABLES = ["guest_questions", "site_stats", "media", "sites"]
 
 
 def state():
@@ -88,7 +88,12 @@ def load():
 
 def remove(remember=True):
     for name in DEMO_TABLES:
-        for r in getattr(app_tables, name).search(is_demo=True):
+        try:
+            rows = list(getattr(app_tables, name).search(is_demo=True))
+        except Exception as err:  # guest_questions: missing until the owner accepts the schema change
+            print("%s not ready: %r" % (name, err))
+            continue
+        for r in rows:
             r.delete()
     for u in app_tables.users.search(is_demo=True):
         u.delete()

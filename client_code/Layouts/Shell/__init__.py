@@ -33,7 +33,9 @@ class Shell(ShellTemplate):
         self.tabbar.visible = bool(me)
         self.menu.visible = False
         state.set_attr(self.brand, "href", "#sites" if me else "#landing")
-        links = [{"page": p, "label": label, "icon": icon, "on": p == page} for p, label, icon in router.NAV] if me else []
+        waiting = int((me or {}).get("questions_new") or 0)
+        links = [{"page": p, "label": label, "icon": icon, "on": p == page, "count": waiting if p == "questions" else 0}
+                 for p, label, icon in router.NAV] if me else []
         self.nav_panel.items = links
         self.tab_panel.items = links
         self.tab_profile.classes["on"] = page == "profile"

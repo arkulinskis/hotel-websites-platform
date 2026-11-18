@@ -1,0 +1,21 @@
+<div class="ui-item qs-item">
+  <div class="grow">
+    <div class="meta">
+      <span class="ui-badge brand" anvil:dom-node="site"></span>
+      <b anvil:dom-node="who"></b>
+      <a anvil:name="email_link" class="qs-mail"><span anvil:dom-node="email"></span></a>
+      <span class="ui-badge" anvil:dom-node="lang"></span>
+      <span class="muted small" anvil:dom-node="when"></span>
+    </div>
+    <p class="qs-msg" anvil:dom-node="message"></p>
+    <p class="fine-print qs-persona" anvil:dom-node="persona"></p>
+    <div class="ui-row qs-actions">
+      <anvil-component type="Button" name="reply_button" prop:text="Reply by email" prop:role='["btn", "btn-sm", "btn-primary", "ic-mail"]'></anvil-component>
+      <anvil-component type="Button" name="faq_button" prop:text="Add to FAQ" prop:role='["btn", "btn-sm", "ic-plus"]'></anvil-component>
+      <anvil-component type="Button" name="status_button" prop:text="Mark answered" prop:role='["btn", "btn-sm", "btn-ghost", "ic-check"]'></anvil-component>
+      <anvil-component type="Button" name="archive_button" prop:text="Archive" prop:role='["btn", "btn-sm", "btn-ghost", "ic-inbox"]'></anvil-component>
+      <span class="ui-spacer"></span>
+      <anvil-component type="Button" name="delete_button" prop:text="Delete" prop:role='["btn", "btn-sm", "btn-danger", "ic-trash"]'></anvil-component>
+    </div>
+  </div>
+</div>

@@ -8,6 +8,7 @@ import anvil.users
 
 from . import common as C
 from . import AdminAccess
+from . import GuestQuestions
 
 ADMIN_EMAILS = AdminAccess.ADMIN_EMAILS  # from the App Secret `admin_emails`
 
@@ -33,7 +34,9 @@ def get_me():
         changes["last_seen"] = C.now()
     if changes:
         user.update(**changes)
-    return me_dict(user)
+    out = me_dict(user)
+    out["questions_new"] = GuestQuestions.count_new(user)
+    return out
 
 
 @anvil.server.callable(require_user=True)

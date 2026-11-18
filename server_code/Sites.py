@@ -14,6 +14,7 @@ import re
 import anvil.server
 from anvil.tables import app_tables
 import anvil.tables as tables
+import anvil.tables.query as tq
 
 from . import common as C
 from . import DemoData
@@ -25,21 +26,22 @@ BAD_URL = re.compile(r"^[\s\x00-\x1f]*(javascript|vbscript|data|file|blob)\s*:",
 
 
 # ----------------------------------------------------------------------------------------------- helpers
-def clean_data(value, depth=0):
+def clean_data(value, depth=0, texts=False):
     """A JSON-safe copy of what the browser sent: plain types only, strings capped, dangerous URL schemes removed.
-    Every page escapes text when drawing; this stops `javascript:` links reaching pages served from the app's domain."""
+    Every page escapes text when drawing; this stops `javascript:` links reaching pages served from the app's domain.
+    texts=True inside data.i18n: translations are keyed by the English text itself, so keys stay long there."""
     if depth > 12:
         return None
     if isinstance(value, dict):
         out = {}
-        for k, v in list(value.items())[:400]:
-            k = str(k)[:60]
+        for k, v in list(value.items())[:3000 if texts else 400]:
+            k = str(k)[:20000 if texts else 60]
             if k.startswith("__"):
                 continue
-            out[k] = clean_data(v, depth + 1)
+            out[k] = clean_data(v, depth + 1, texts or (depth == 0 and k == "i18n"))
         return out
     if isinstance(value, (list, tuple)):
-        return [clean_data(v, depth + 1) for v in list(value)[:1500]]
+        return [clean_data(v, depth + 1, texts) for v in list(value)[:1500]]
     if isinstance(value, bool) or value is None:
         return value
     if isinstance(value, (int, float)):
@@ -127,12 +129,29 @@ def my_sites():
     user = C.require_user()
     DemoData.ensure_loaded()
     claim_pending(user)
-    mine = [summary(s, user) for s in app_tables.sites.search(tables.order_by("updated", ascending=False), owner=user)]
-    managed = []
+    rows = list(app_tables.sites.search(tables.order_by("updated", ascending=False), owner=user))
+    others = []
     if C.is_admin(user):
-        managed = [summary(s, user) for s in app_tables.sites.search(tables.order_by("updated", ascending=False))
-                   if s["owner"] is None or s["owner"] != user]
-    return {"sites": mine, "managed": managed, "max": MAX_SITES}
+        others = [s for s in app_tables.sites.search(tables.order_by("updated", ascending=False))
+                  if s["owner"] is None or s["owner"] != user]
+    waiting = new_questions(rows + [s for s in others if not s["is_demo"]])
+    mine = [dict(summary(s, user), questions_new=waiting.get(s.get_id(), 0)) for s in rows]
+    managed = [dict(summary(s, user), questions_new=waiting.get(s.get_id(), 0)) for s in others]
+    return {"sites": mine, "managed": managed, "max": MAX_SITES, "questions_new": sum(waiting.values())}
+
+
+def new_questions(sites):
+    """{site id: number of new guest questions} (GuestQuestions.py has the inbox)."""
+    out = {}
+    if not sites:
+        return out
+    try:
+        for q in app_tables.guest_questions.search(site=tq.any_of(*sites), status="new"):
+            sid = q["site"].get_id()
+            out[sid] = out.get(sid, 0) + 1
+    except Exception as err:  # the table appears once the owner accepts the schema change
+        print("guest_questions not ready: %r" % err)
+    return out
 
 
 @anvil.server.callable(require_user=True)
@@ -254,6 +273,11 @@ def delete_site(site_id):
         m.delete()
     for s in app_tables.site_stats.search(site=site):
         s.delete()
+    try:
+        for q in app_tables.guest_questions.search(site=site):
+            q.delete()
+    except Exception as err:  # before the schema change is accepted the table isn't there yet
+        print("guest_questions not ready: %r" % err)
     site.delete()
     return C.ok()
 

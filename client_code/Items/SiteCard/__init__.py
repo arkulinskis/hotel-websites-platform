@@ -7,7 +7,7 @@ from ... import ns, router, state
 
 class SiteCard(SiteCardTemplate):
     """A hotel site on #sites. item = Sites.summary() (id, name, city, slug, status, url, cover, palette, updated, views,
-    unpublished_changes, owner, pending_owner, is_showcase, demo, mine), or {"new": True} for the "Create" card."""
+    unpublished_changes, owner, pending_owner, is_showcase, demo, mine, questions_new), or {"new": True} for the "Create" card."""
 
     def __init__(self, **properties):
         super().__init__(**properties)
@@ -46,6 +46,9 @@ class SiteCard(SiteCardTemplate):
             state.set_attr(self.view_link, "href", url)
             anvil.js.get_dom_node(self.link).textContent = ns.short_url(url)
         self.changes.visible = bool(s.get("unpublished_changes"))
+        nq = int(s.get("questions_new") or 0)
+        self.questions_link.visible = nq > 0
+        self.dom_nodes["questions"].textContent = state.plural(nq, "new question from a guest", "new questions from guests")
         state.set_attr(self.edit_link, "href", router.href("edit", s["id"]))
         state.set_attr(self.edit_link, "aria-label", "Edit " + (s.get("name") or "site"))
 

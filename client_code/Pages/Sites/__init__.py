@@ -28,3 +28,5 @@ class Sites(SitesTemplate):
         self.sites_panel.items = items
         self.managed_box.visible = bool(d["managed"])
         self.managed_panel.items = d["managed"]
+        if state.me() is not None and "questions_new" in d:
+            state.me()["questions_new"] = d["questions_new"]

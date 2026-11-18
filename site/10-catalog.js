@@ -140,10 +140,21 @@
                c: { bg: '#fbfaf7', surface: '#ffffff', ink: '#2b2d2a', muted: '#6b6f69', line: '#e6e2d9', brand: '#6b5b95', brandInk: '#ffffff', accent: '#7a8c4e', soft: '#eeeaf5', deep: '#2b2440' } }
   };
 
-  /* ------------------------------------------------------------------ typography pairs (Google Fonts) */
+  /* ------------------------------------------------------------------ typography pairs (Google Fonts)
+     Jost (Google Fonts) draws the Latvian macrons (ā ē ī ū) on the wrong letter, like Fraunces (APP_MAKER/ANVIL_NOTES.md).
+     So Belle Époque loads Jost only for basic Latin, Western European and Cyrillic letters (css2: the text= parameter) and
+     every other letter (Latvian, Lithuanian, Polish…) falls back to Figtree, a near-identical geometric sans. */
+  var JOST_TEXT = (function () {
+    var s = '', c;
+    for (c = 32; c < 127; c++) s += String.fromCharCode(c);
+    for (c = 160; c < 256; c++) s += String.fromCharCode(c);
+    for (c = 0x400; c < 0x460; c++) s += String.fromCharCode(c);
+    return s + '\u2013\u2014\u2018\u2019\u201c\u201d\u201e\u00ab\u00bb\u2026\u20ac\u2022\u00b7\u2116';
+  })();
   NS.FONTS = {
-    belle:     { name: 'Belle Époque', display: 'Cormorant Garamond', body: 'Jost',
-                 css: 'family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Jost:wght@400;500;600' },
+    belle:     { name: 'Belle Époque', display: 'Cormorant Garamond', body: 'Jost', fallback: 'Figtree',
+                 css: 'family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Figtree:wght@400;500;600',
+                 css2: 'family=Jost:wght@400;500;600&text=' + encodeURIComponent(JOST_TEXT) },
     secession: { name: 'Secession', display: 'Federo', body: 'Lora',
                  css: 'family=Federo&family=Lora:ital,wght@0,400;0,500;0,600;1,400' },
     atelier:   { name: 'Atelier', display: 'Playfair Display', body: 'Karla',
@@ -154,6 +165,15 @@
   NS.fontsUrl = function (key) {
     var f = NS.FONTS[key] || NS.FONTS.belle;
     return 'https://fonts.googleapis.com/css2?' + f.css + '&display=swap';
+  };
+  /* Every stylesheet a pair needs (Belle Époque: two, see above). */
+  NS.fontsUrls = function (key) {
+    var f = NS.FONTS[key] || NS.FONTS.belle;
+    return [NS.fontsUrl(key)].concat(f.css2 ? ['https://fonts.googleapis.com/css2?' + f.css2 + '&display=swap'] : []);
+  };
+  NS.bodyStack = function (key) {
+    var f = NS.FONTS[key] || NS.FONTS.belle;
+    return '"' + f.body + '", ' + (f.fallback ? '"' + f.fallback + '", ' : '') + 'system-ui, sans-serif';
   };
 
   /* ------------------------------------------------------------------ hotel amenities (highlights + persona perks) */

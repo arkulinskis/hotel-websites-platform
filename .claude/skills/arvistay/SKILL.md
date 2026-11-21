@@ -68,7 +68,8 @@ site/*.js, *.css           THE HOTEL-SITE RENDERER, joined by tools/build_site.p
                            PERSONAS (30), SECTIONS, CHANNELS, PAYMENTS
   15-i18n.js               languages: NS.LANGS, NS.lang, NS.t (built-in words), NS.th (same, HTML vars), NS.tr (the owner's texts:
                            data.i18n[lang][english] else DICT else English), siteLangs, setLang, tIn, browserLang. DICT = English ->
-                           [Latvian, Russian, German], ~430 phrases incl. all 30 profiles and the stay plan
+                           [Latvian, Russian, German, French], ~460 phrases incl. all 30 profiles and the stay plan
+                           (tools/i18n_dict.py checks 4 strings + {placeholders} per row; check.py runs it)
   20-engine.js             places(), fit(), rankPersonas, enabledPersonas, numbers(), describe(), story() (the stay plan), draft.*
   30-render.js             mount(root, data, opts), boot(), previewListen(); every section's HTML, nav, footer, theme, stats pings
   40-widgets.js            videoInfo, Modal, Lightbox, Carousel, Film, Pano (WebGL 360), Map (MapLibre 3D) + FlatMap
@@ -91,14 +92,15 @@ country, address, lat, lng, phone, email, whatsapp, checkin, checkout, checkin_n
 `story`, `highlights[]`, `rooms[{id, name, size, beds, guests, price, text, features[], tags[], photos[], pano, tour, video}]`, `rooms_intro`,
 `walkthrough{items[{kind pano|embed|photos, src, embed, stops[], title, text, credit}]}`, `gallery{layout, items[{src, caption}]}`,
 `videos[]`, `dining{...}`, `ratings[]`, `reviews[]`, `booking{intro, channels[{kind, url, label}], payment{methods[], when, note}, perk, policies[]}`,
-`faq[]`, `contact{directions[], social[], ask_off}`, `langs[]` (lv/ru/de switched on), `i18n{<lang>{<english text>: translation}}`, `neighborhood{title, intro}`, `personas{enabled[], featured, title, lead, overrides{<id>{intro, tip, rooms[], hide[]}}}`,
+`faq[]`, `contact{directions[], social[], ask_off}`, `langs[]` (lv/ru/de/fr switched on), `booking.request{on, note}` (date-request form, off by default), `booking.after{google_review, return_perk, return_code}` (the #thanks sheet + thank-you QR card), `i18n{<lang>{<english text>: translation}}`, `neighborhood{title, intro}`, `personas{enabled[], featured, title, lead, overrides{<id>{intro, tip, rooms[], hide[]}}}`,
 `places[{id, name, cat, sub, lat, lng, wiki{...}, note, pinned, hidden, diet}]`, `credits[]`, `scan`, `seo`, `todo[]`, `todo_done[]`.
 Media refs: `"m:<key>"` (upload, `<api>/m/<key>`), `"a:<file>"` (theme asset), or a plain URL.
 
 **Tables:** `users` (+ legal columns), `app_settings` (demo, showcase), `feedback`, `sites` (owner, slug, name, city, status
 draft|published, data, live, version, created, updated, published_at, cover, pending_owner, views, is_demo, is_showcase), `media`
 (key, site, owner, kind image|pano|video, file, ...), `site_stats` (site, day, views, personas{id: n}, is_demo), `guest_questions`
-(site, name, email, message, lang, persona, status new|answered|archived, created, answered_at, notified, is_demo; 2026-11).
+(site, name, email, message, lang, persona, status new|answered|archived, created, answered_at, notified, is_demo; 2026-11; + kind question|dates, details{arrive, nights, adults, children, room, phone}, 2026-11-20:
+read/write them guarded, the summary also sits at the top of `message`).
 
 ## How things are done here (Forms)
 
@@ -131,7 +133,9 @@ draft|published, data, live, version, created, updated, published_at, cover, pen
   declining place names (write "Kafija: {n}" / «{n}»).
 - **A new owner field that should be translatable:** add its path to TR_GROUPS in theme/assets/ns-editor.js and render it with
   `TR(...)` in site/30-render.js.
-- **Another language:** NS.LANGS + LANG_ORDER + a 4th column in DICT (IDX), EXTRA_LANGS in ns-editor.js, LANGS/LOCALES in Hosting.py,
+- **Date requests / thank-you sheet (2026-11-20):** see APP_MAP Notes. French typography in DICT: no-break space before ':' and
+  inside guillemets, none before ! ? ; (Quebec style); `heroFor` keeps French profile names capitalised.
+- **Another language:** NS.LANGS + LANG_ORDER + one more column in DICT (IDX; COLUMNS in tools/i18n_dict.py), EXTRA_LANGS in ns-editor.js, LANGS/LOCALES in Hosting.py,
   LANGS in GuestQuestions.py, LANG_NAMES in Items/QuestionRow.
 - **Kristofs content:** `kristofs()` in the OLD folder's tools/make_seed.py writes server_code/showcase_data.py (copy it over);
   live, an admin deletes the showcase and presses "Restore the Hotel Kristofs showcase" (Admin -> Demo data).

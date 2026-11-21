@@ -560,7 +560,10 @@
 /* 4. The reception QR card (Dialogs/QrCard): a printable A4 page in the site's own palette and fonts, with a QR code
    to the hotel site, a line in every language the site speaks, and (optionally) the Wi-Fi with its own QR code.
      NSApp.qrReady()                          loads theme/assets/ns-qr.js (qrcode-generator, MIT) the first time
-     NSApp.qrCard(dataJson, url, optsJson)   -> the whole HTML document; opts {layout: tent | cards | poster, wifi: {name, pass}}
+     NSApp.qrCard(dataJson, url, optsJson)   -> the whole HTML document; opts {layout: tent | cards | poster, wifi: {name, pass},
+                                                kind: welcome | thanks}. "thanks" = the check-out card: "Thank you for staying with
+                                                us" in every site language, the come-back perk + code, a QR to <site>#thanks
+                                                (the review / tell-us-privately sheet, site/30-render.js); no Wi-Fi.
      NSApp.printDoc(html)                     prints it from a hidden frame (no pop-up window) */
 (function () {
   'use strict';
@@ -584,12 +587,15 @@
     return 'WIFI:T:' + (pass ? 'WPA' : 'nopass') + ';S:' + e(name) + ';' + (pass ? 'P:' + e(pass) + ';' : '') + ';';
   }
   var LINES = ['Scan to plan your stay', 'Your stay hour by hour, the neighbourhood map, and a place to ask us anything.'];
+  var THANKS = ['Thank you for staying with us', 'Tell others about your stay, or tell us privately: scan the code.'];
 
   A.qrCard = function (dataJson, url, optsJson) {
     var data = JSON.parse(dataJson || '{}'), o = JSON.parse(optsJson || '{}');
     var h = data.hotel || {}, t = data.theme || {};
     var pal = (NS.PALETTES[t.palette] || NS.PALETTES.riga).c, f = NS.FONTS[t.fonts] || NS.FONTS.belle;
-    var langs = NS.siteLangs(data), layout = o.layout || 'tent', wifi = o.wifi || {};
+    var langs = NS.siteLangs(data), layout = o.layout || 'tent', thanks = o.kind === 'thanks', wifi = thanks ? {} : (o.wifi || {});
+    var lines = thanks ? THANKS : LINES, after = (data.booking || {}).after || {};
+    if (thanks && url) url = String(url).split('#')[0] + '#thanks';
     var name = h.name || 'Our hotel', stars = '', short = String(url || '').replace(/^https?:\/\//, '');
     for (var i = 0; i < (+h.stars || 0); i++) stars += '★';
     var dark = (NS.PALETTES[t.palette] || {}).dark;
@@ -597,8 +603,11 @@
     var qr = A.qrSvg(url || 'https://arvistay.com', qrInk);
     var wifiQr = wifi.name ? A.qrSvg(wifiText(wifi.name, wifi.pass), '#111') : '';
     function say(k, lang) { return lang === 'en' ? k : (NS.tIn(lang, k) || k); }
-    var heads = langs.map(function (l, k) { return '<p class="' + (k ? 'alt' : 'main') + '" lang="' + l + '">' + esc(say(LINES[0], l)) + '</p>'; }).join('');
-    var sub = '<p class="sub" lang="' + langs[0] + '">' + esc(LINES[1]) + '</p>';
+    var heads = langs.map(function (l, k) { return '<p class="' + (k ? 'alt' : 'main') + '" lang="' + l + '">' + esc(say(lines[0], l)) + '</p>'; }).join('');
+    var sub = '<p class="sub" lang="' + langs[0] + '">' + esc(lines[1]) + '</p>';
+    var perk = String(after.return_perk || '').trim(), code = String(after.return_code || '').trim().toUpperCase().slice(0, 24);
+    var back = thanks && (perk || code) ? '<p class="back">' + esc(perk && code ? 'Come back direct: ' + perk.replace(/^come back direct:\s*/i, '') + ' · code ' : perk ? 'Come back direct: ' + perk.replace(/^come back direct:\s*/i, '') : 'Come back direct with code ') +
+      (code ? '<b>' + esc(code) + '</b>' : '') + '</p>' : '';
     var wifiBox = wifi.name ? '<div class="wifi">' + wifiQr + '<div><b>Wi-Fi</b><span>' + esc(wifi.name) + '</span>' + (wifi.pass ? '<span class="pw">' + esc(wifi.pass) + '</span>' : '') + '</div></div>' : '';
     var corner = '<svg class="cn" viewBox="0 0 80 80" aria-hidden="true"><path d="M2 78V30C2 14 14 2 30 2h48M10 78V36c0-14 12-26 26-26h42"/><path d="M2 50c10 0 18-6 18-16 0-6-4-10-9-10-4 0-7 3-7 7 0 3 2 5 5 5"/><circle cx="30" cy="30" r="3"/></svg>';
     var initial = (String(name).replace(/^(hotel|boutique|the|villa|pension|guesthouse|hostel)\s+/ig, '').trim() || 'H').charAt(0).toUpperCase();
@@ -606,7 +615,7 @@
     function panel(cls) {
       return '<section class="card ' + cls + '"><div class="frame">' + corner.replace('cn', 'cn tl') + corner.replace('cn', 'cn tr') + corner.replace('cn', 'cn bl') + corner.replace('cn', 'cn br') +
         '<div class="txt"><div class="brand">' + mono + '<div><b class="name">' + esc(name) + '</b>' + (stars ? '<span class="stars">' + stars + '</span>' : '') +
-        (h.address ? '<span class="addr">' + esc(h.address) + '</span>' : '') + '</div></div>' + heads + sub + wifiBox + '</div>' +
+        (h.address ? '<span class="addr">' + esc(h.address) + '</span>' : '') + '</div></div>' + heads + sub + back + wifiBox + '</div>' +
         '<div class="code">' + qr + '<span class="url">' + esc(short) + '</span></div></div></section>';
     }
     var body;
@@ -627,6 +636,8 @@
       '.addr{display:block;font-size:2.8mm;color:' + pal.muted + ';margin-top:.6mm}' +
       'p{margin:0}.main{font:600 9.5mm/1.05 "' + f.display + '",Georgia,serif;color:' + pal.brand + '}.alt{font:500 4.4mm/1.25 "' + f.display + '",Georgia,serif;color:' + pal.ink + '}' +
       '.sub{font-size:3.3mm;line-height:1.4;color:' + pal.muted + ';margin-top:1mm;max-width:95mm}' +
+      '.back{font-size:3.4mm;line-height:1.4;margin-top:1.5mm;padding:2mm 3mm;border:.3mm dashed ' + pal.accent + ';border-radius:3mm;background:' + pal.surface + ';width:max-content;max-width:100%}' +
+      '.back b{font-family:ui-monospace,Menlo,Consolas,monospace;letter-spacing:.3mm;color:' + pal.brand + '}.small .back{font-size:2.8mm}.big .back{font-size:5mm;padding:3mm 5mm}' +
       '.wifi{display:flex;gap:3mm;align-items:center;margin-top:2mm;padding:2.2mm 3mm;border:.3mm dashed ' + pal.line + ';border-radius:3mm;background:' + pal.surface + ';width:max-content;max-width:100%}' +
       '.wifi svg{width:15mm;height:15mm;flex:none}.wifi b{display:block;font-size:2.6mm;letter-spacing:.4mm;text-transform:uppercase;color:' + pal.accent + '}' +
       '.wifi span{display:block;font-size:3.6mm;font-weight:600;overflow-wrap:anywhere}.wifi .pw{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:500}' +

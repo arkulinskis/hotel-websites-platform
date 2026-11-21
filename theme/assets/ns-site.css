@@ -496,6 +496,57 @@
 .ns-faq-ask .ns-ic { color: var(--a); }
 .ns-faq-ask a { font-weight: 600; }
 
+/* "Ask us for your dates" (booking.request.on): a gilt-framed box under the booking steps */
+.ns-request { position: relative; margin: 6px 0 26px; padding: 30px 30px 26px; border-radius: var(--r); background: color-mix(in srgb, var(--a) 9%, var(--s));
+  border: 1px solid var(--a); box-shadow: inset 0 0 0 5px var(--s), inset 0 0 0 6px color-mix(in srgb, var(--a) 45%, transparent); }
+.ns-request .ns-corner { width: 46px; height: 46px; }
+.ns-request .ns-corner.tl { top: 12px; left: 12px; }
+.ns-request .ns-corner.tr { top: 12px; right: 12px; }
+.ns-request-head { display: flex; gap: 14px; align-items: flex-start; margin: 0 44px 16px; }
+.ns-request-head > .ns-ic { width: 30px; height: 30px; color: var(--a); margin-top: 2px; }
+.ns-request-head h3 { margin: 0 0 4px; }
+.ns-request-head p { margin: 0; color: var(--m); font-size: .95rem; }
+.ns-request-perk { display: flex; gap: 10px; align-items: flex-start; margin: 0 0 18px; padding: 12px 16px; border-radius: 14px; background: var(--b); border: 1px dashed var(--a); font-size: .95rem; }
+.ns-request-perk .ns-ic { color: var(--a); margin-top: 3px; }
+.ns-request-perk b { color: var(--a); margin-right: 4px; }
+.ns-request-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.ns-request-grid .w2 { grid-column: span 2; }
+.ns-request-grid .w3 { grid-column: span 3; }
+.ns-request-form select { width: 100%; min-height: 48px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--l); background: var(--b); color: var(--i);
+  font: 400 1rem/1.45 var(--fb); transition: border-color .15s, box-shadow .15s; }
+.ns-request-form select:focus { outline: none; border-color: var(--p); box-shadow: 0 0 0 3px color-mix(in srgb, var(--p) 22%, transparent); }
+.ns-request-form input[type="date"] { display: block; min-width: 0; }
+.ns-request-form textarea { min-height: 96px; }
+.ns-room-ask { align-self: flex-end; display: inline-flex; align-items: center; gap: 7px; min-height: 44px; margin-top: 4px; padding: 0 2px; border: 0; background: none;
+  color: var(--p); font: 600 .88rem/1.2 var(--fb); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; transition: color .15s; }
+.ns-room-ask:hover { color: var(--a); }
+
+/* the thank-you sheet (#thanks): review places and the private note side by side, then the come-back code */
+.ns-thanks-modal .ns-modal-box { width: min(760px, 100%); padding: 34px 30px 30px; }
+.ns-thanks { display: grid; gap: 22px; }
+.ns-thanks-head { text-align: center; display: grid; justify-items: center; gap: 4px; }
+.ns-thanks-head .ns-mono { width: 44px; height: 52px; margin-bottom: 6px; }
+.ns-thanks-head h2 { font-size: clamp(1.9rem, 6vw, 2.7rem); margin: 0; }
+.ns-thanks-head p { margin: 0; color: var(--m); }
+.ns-thanks-head .ns-divider { margin-top: 10px; }
+.ns-thanks-grid { display: grid; gap: 16px; }
+.ns-thanks-grid.two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.ns-thanks-card, .ns-thanks-back { padding: 22px; border-radius: 18px; display: flex; flex-direction: column; }
+.ns-thanks-card { background: var(--s); border: 1px solid var(--l); }
+.ns-thanks-back { border: 1px solid var(--a); background: color-mix(in srgb, var(--a) 10%, var(--b)); }
+.ns-thanks-card h3, .ns-thanks-back h3 { display: flex; gap: 10px; align-items: center; font-size: 1.35rem; margin-bottom: 6px; }
+.ns-thanks-card h3 .ns-ic, .ns-thanks-back h3 .ns-ic { color: var(--a); }
+.ns-thanks-card p { color: var(--m); font-size: .95rem; }
+.ns-thanks-revs { display: flex; flex-wrap: wrap; gap: 10px; margin-top: auto; }
+.ns-thanks-revs .ns-btn { flex: 1 1 auto; }
+.ns-thanks-act { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.ns-code { display: inline-flex; align-items: center; gap: 10px; padding: 5px 5px 5px 16px; border-radius: 999px; background: var(--b); border: 1px dashed var(--a); }
+.ns-code span { font-size: .72rem; color: var(--m); text-transform: uppercase; letter-spacing: .12em; }
+.ns-code b { font: 600 1.15rem/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .08em; }
+.ns-code .ns-btn { min-height: 44px; }
+.ns-code .ns-btn span { font: inherit; color: inherit; text-transform: none; letter-spacing: inherit; }
+.ns-code .ns-btn.ok { border-color: var(--p); color: var(--p) !important; }
+
 /* modal + lightbox */
 .ns-modal { position: fixed; inset: 0; z-index: 1000; background: rgba(8, 10, 9, .72); display: grid; place-items: center; padding: 16px; animation: ns-fade .2s; }
 .ns-modal-box { position: relative; width: min(1100px, 100%); max-height: 92vh; overflow: auto; background: var(--b); border-radius: var(--r); padding: 20px; }
@@ -540,6 +591,16 @@
   .ns-ask { padding: 22px 18px; }
   .ns-ask-row { grid-template-columns: minmax(0, 1fr); }
   .ns-ask-foot .ns-btn { width: 100%; }
+  .ns-request { padding: 22px 16px 20px; }
+  .ns-request .ns-corner { display: none; }
+  .ns-request-head { margin: 0 0 14px; }
+  .ns-request-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .ns-request-grid .w3 { grid-column: span 1; }
+  .ns-thanks-modal .ns-modal-box { padding: 28px 16px 18px; }
+  .ns-thanks-grid.two { grid-template-columns: minmax(0, 1fr); }
+  .ns-thanks-card, .ns-thanks-back { padding: 18px 16px; }
+  .ns-thanks-act > *, .ns-code { width: 100%; }
+  .ns-code { justify-content: space-between; }
   .ns-hero-in { min-height: min(86vh, 720px); }
   .ns-hero-text { padding: 90px 18px 84px; }
   .ns-hero-cta .ns-btn { flex: 1 1 auto; }

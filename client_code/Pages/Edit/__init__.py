@@ -194,13 +194,18 @@ class Edit(EditTemplate):
             self.go_tab(SECTION_TAB[m["section"]], scroll=False)
 
     def _preview_request(self, msg_json):
-        """The Guests tab's "See it on the site": show that profile's stay in the preview."""
+        """The Guests tab's "See it on the site" (that profile's stay) and the Booking tab's "See the thank-you sheet"
+        (the #thanks sheet the check-out QR card opens), shown in the preview."""
         m = json.loads(msg_json)
         if m.get("type") == "show-persona":
             self.post({"type": "ns-persona", "persona": m.get("persona")})
             self.post({"type": "ns-scroll", "section": "stay"})
-            if window.innerWidth < 860:
-                self._show_preview(True)
+        elif m.get("type") == "show-thanks":
+            self.post({"type": "ns-thanks"})
+        else:
+            return
+        if window.innerWidth < 860:
+            self._show_preview(True)
 
     def set_persona(self, pid):
         self.persona = pid or ""

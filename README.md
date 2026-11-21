@@ -28,12 +28,20 @@ Built on [Anvil](https://anvil.works). The first site is **Boutique Hotel Kristo
   "check dates"), 360° viewer (WebGL, drag to look, full screen), photo walk ("walk from our door"), galleries (bento,
   masonry, film strip, arched frames) with a lightbox, videos, dining, scores and reviews, **how booking and payment work**
   (3 steps, booking buttons, payment methods, perk, house rules), FAQ, contact and directions, photo and data credits.
-- **Languages:** English plus Latvian, Russian and German when the owner switches them on. An EN · LV · RU · DE button
+- **Languages:** English plus Latvian, Russian, German and French (2026-11-20, neutral Quebec-friendly French) when the owner
+  switches them on. An EN · LV · RU · DE · FR button
   (in the menu on phones); the guest's browser language is picked first and remembered; `?lang=lv` links, `<html lang>`,
   hreflang links for search engines. Every built-in word, the 30 guest profiles and the whole hour-by-hour stay are
   translated automatically; the owner translates their own texts in the editor (untranslated ones show in English).
 - **Ask us a question:** a form in the contact section (and a link under the FAQ), in the page's language. Questions go to
   the owner's inbox and email (spam guards: hidden field, typing time, 20 per site per hour). The owner can switch it off.
+- **Ask us for your dates** (2026-11-20, off by default; Booking tab): a gilt box under the booking steps with the perk,
+  arrival, nights, adults, children, room ("Ask us directly" on each room card picks it), name, email, phone and a note.
+  An enquiry, not a booking: the OTA buttons stay first. Same endpoint and spam guards as the question form; past dates
+  are refused. Works on hosted and exported sites.
+- **Thank-you sheet** (`#thanks`, 2026-11-20): opened by the check-out QR card, in the guest's language: review buttons
+  (the Google review link, then every score with a link), "Tell us privately" (the question form) side by side (no
+  review gating), and the come-back perk + code with Copy and "Ask for your dates". Closing it strips `#thanks`.
 - Six palettes (Riga Jugend, Mucha, Horta, Klimt, Peacock, Lily), four type pairs, three ornament levels. SEO title,
   description, link previews and schema.org Hotel data. Anonymous visit and profile-pick counts (no cookies).
 
@@ -47,7 +55,8 @@ Built on [Anvil](https://anvil.works). The first site is **Boutique Hotel Kristo
   sections on/off/order), Texts ("Write it for me" drafts), Rooms, Media (library, uploads, gallery, videos, 360° and tours,
   dining), Area (rescan with radius, search, star, hide, tips, add a place), Guests (30 profiles with fit scores, enable,
   "first", per-profile intro, tip, recommended rooms, categories to leave out, live story preview), Booking (channels,
-  payment, perk, rules, scores, reviews, FAQ), Languages (switch on Latvian / Russian / German, preview the site in each,
+  payment, perk, direct date requests, rules, scores, reviews, after the stay: Google review link + come-back perk and code,
+  FAQ), Languages (switch on Latvian / Russian / German / French, preview the site in each,
   translate every text of their own with a progress bar and "only the ones still in English", clean up stale
   translations), Publish (address/slug check, publish/republish/unpublish, **a printable QR card for reception**, visit
   chart and profile picks, SEO, export, domain help, duplicate, delete). Live preview (desktop / tablet / phone, "Preview as" a
@@ -56,9 +65,13 @@ Built on [Anvil](https://anvil.works). The first site is **Boutique Hotel Kristo
 - `#questions` inbox: every guest question to their sites (New / Answered / Archived / All, a site picker), with the guest's
   language and profile; **Reply by email** (a ready mail with the question quoted), **Add to FAQ** (the question and their
   answer go into the site's FAQ draft), mark answered, archive, delete. A count in the menu and on the site cards.
+  Date requests get a gilt **Date request** badge and a dates line ("12-15 Mar 2027 · 3 nights · 2 adults, 1 child ·
+  Twin Room"); **Reply with an offer** writes the offer email in the guest's language (English under it) with blanks
+  for the price and a 48-hour hold.
 - **QR card for reception** (Publish tab): table card that folds and stands, four small cards per sheet, or an A4 poster,
   in the site's palette and fonts, with a line in every language the site speaks and an optional Wi-Fi join code (the
-  Wi-Fi name and password stay in that browser only).
+  Wi-Fi name and password stay in that browser only). A second card, **Thank you** (for check-out): "Thank you for
+  staying with us" in every site language, the come-back line and a QR code to `<site>#thanks`.
 
 **For everyone:** landing page for hotel owners (with a small "what your guests see" demo), Explore (all published sites),
 sign-up, feedback form, Privacy & Terms (`#legal`).
@@ -89,15 +102,15 @@ What this project uses besides its own code. Generated by `APP_MAKER/tools/libra
 | [MapLibre GL JS](https://maplibre.org) 4.7.1 | Loaded from a CDN | A smooth, vector-based map (drawn with WebGL) that can be styled to match a design. |
 | [Nominatim](https://nominatim.org) | Outside web service | OpenStreetMap's address search: turns an address into a map position, and back. |
 | [OpenFreeMap](https://openfreemap.org) | Outside web service | Free vector map tiles: the shapes of streets, buildings, parks and water. |
-| [Photon](https://photon.komoot.io) | Outside web service | A fast address search built on OpenStreetMap, good for "search as you type". |
 | [Overpass API](https://wiki.openstreetmap.org/wiki/Overpass_API) | Outside web service | Asks OpenStreetMap questions like "every café within 500 m of here". |
+| [Photon](https://photon.komoot.io) | Outside web service | A fast address search built on OpenStreetMap, good for "search as you type". |
 | [Wikimedia Commons API](https://commons.wikimedia.org) | Outside web service | Searches Wikipedia's free photo library. |
 | [YouTube embeds](https://developers.google.com/youtube/player_parameters) | Outside web service | Plays a YouTube video inside the page (the privacy-friendlier youtube-nocookie address). |
 | [Google Fonts](https://fonts.google.com) | Loaded from a CDN | Cormorant Garamond, Federo, Figtree, Jost, Karla, Lora, Marcellus, Mulish, Playfair Display |
 
 **Built into the browser:** Canvas 2D, WebGL, localStorage, Clipboard, File downloads (Blob), Fullscreen, IntersectionObserver.
 
-**Anvil platform:** Anvil, Anvil Data Tables, Anvil JS bridge (anvil.js), Anvil Secrets, Anvil Users, Anvil Google service, Anvil Email.
+**Anvil platform:** Anvil, Anvil Data Tables, Anvil Email, Anvil JS bridge (anvil.js), Anvil Secrets, Anvil Users, Anvil Google service, Anvil HTTP, Anvil timezones (anvil.tz).
 
 **Build and test tools (not shipped):** axe-core, Node.js, Headless Chrome (DevTools Protocol), PyYAML.
 

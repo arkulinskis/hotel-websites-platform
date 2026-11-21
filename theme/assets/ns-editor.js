@@ -100,12 +100,13 @@
     ['Guests', ['personas.title', 'personas.lead', 'personas.overrides.*.intro', 'personas.overrides.*.tip']],
     ['Dining', ['dining.eyebrow', 'dining.title', 'dining.body', 'dining.short', 'dining.facts.*.text', 'dining.link_label']],
     ['Booking and payment', ['booking.intro', 'booking.step1', 'booking.step3', 'booking.payment.when', 'booking.payment.note', 'booking.perk',
-      'booking.channels.*.label', 'booking.policies.*.title', 'booking.policies.*.text']],
+      'booking.channels.*.label', 'booking.policies.*.title', 'booking.policies.*.text', 'booking.request.note', 'booking.after.return_perk']],
     ['Questions', ['faq.*.q', 'faq.*.a']],
     ['Getting here', ['contact.directions.*.title', 'contact.directions.*.text']],
     ['Search engines', ['seo.title', 'seo.description']]
   ];
-  var EXTRA_LANGS = ['lv', 'ru', 'de'];
+  var EXTRA_LANGS = ['lv', 'ru', 'de', 'fr'];
+  var LANG_HINTS = { fr: 'Hotels in Quebec must offer French' };
   function collectTexts(obj, path) {
     var parts = path.split('.'), out = [];
     (function walk(cur, i) {
@@ -365,6 +366,12 @@
           '<h3>' + UI.icon('card') + 'Payment</h3><div class="ed-chips">' + Object.keys(NS.PAYMENTS).map(function (k) { return chip('booking.payment.methods', k, NS.PAYMENTS[k]); }).join('') + '</div>' +
           fld('When do guests pay?', 'booking.payment.when', { area: true, rows: 2 }) + fld('Payment note', 'booking.payment.note', { opt: true }) +
           fld('Booking direct perk', 'booking.perk', { area: true, rows: 2, opt: true, ph: 'Book direct and get a welcome drink.' }) +
+          '<h3>' + UI.icon('mail') + 'Direct date requests</h3>' +
+          '<label class="ed-chip ed-ask"><input type="checkbox" data-k="booking.request.on"' + (NS.get(st.data, 'booking.request.on', false) ? ' checked' : '') + '>Show an "Ask us for your dates" form under the booking steps</label>' +
+          '<p class="ui-hint">Guests send their dates, party and room (each room card gets "Ask us directly"). It is a request, not a booking: ' +
+            'it lands in your <a href="#questions">Questions</a> inbox marked <b>Date request</b>, and Reply writes the offer email for you, in the guest\'s language, ' +
+            'with blanks for your price. Your booking-site buttons stay first. Your perk above shows beside the form. Under EU rules, booking sites may not stop you offering a lower price on your own site.</p>' +
+          fld('Line in the form', 'booking.request.note', { area: true, rows: 2, opt: true, ph: 'Tell us when you would like to come. We email you our best direct price, usually within a day.' }) +
           '<h3>' + UI.icon('shield') + 'House rules</h3>' + listEditor('booking.policies', function (x, i, p) {
             return '<div class="ed-g2">' + sel('Icon', p + '.icon', HL_ICONS.map(function (k) { return [k, k]; })) + fld('Title', p + '.title') + '</div>' + fld('Text', p + '.text', { area: true, rows: 2 });
           }, { icon: 'info', title: '', text: '' }, 'Add a rule') +
@@ -374,6 +381,13 @@
           '<h3>' + UI.icon('chat') + 'Reviews</h3>' + listEditor('reviews', function (x, i, p) {
             return fld('Quote', p + '.quote', { area: true, rows: 2 }) + '<div class="ed-g3">' + fld('Name', p + '.author') + fld('Where', p + '.source', { opt: true }) + fld('When', p + '.date', { opt: true }) + '</div>';
           }, { quote: '', author: '' }, 'Add a review') +
+          '<h3>' + UI.icon('heart') + 'After the stay</h3><p class="small muted">The thank-you card (Publish tab, Make a QR card, Thank-you card) opens a sheet on the guest\'s phone, in their language: ' +
+            'your review links, "Tell us privately" and your come-back code, side by side, so every guest gets the same choice.</p>' +
+          fld('Google review link', 'booking.after.google_review', { type: 'url', opt: true, ph: 'https://g.page/r/…/review',
+            hint: 'In your Google Business Profile, choose <b>Ask for reviews</b> (or <b>Get more reviews</b>) and copy the link. Every score above that has a link is shown too.' }) +
+          '<div class="ed-g2">' + fld('Come-back perk', 'booking.after.return_perk', { opt: true, ph: '10% off your next stay when you book direct' }) +
+          fld('Come-back code', 'booking.after.return_code', { opt: true, max: 24, ph: 'WELCOMEBACK' }) + '</div>' +
+          '<button class="ui-btn sm" data-thanksshow>' + UI.icon('globe') + 'See the thank-you sheet</button>' +
           '<h3>' + UI.icon('info') + 'Questions</h3>' + listEditor('faq', function (x, i, p) { return fld('Question', p + '.q') + fld('Answer', p + '.a', { area: true, rows: 2 }); }, { q: '', a: '' }, 'Add a question') +
           '<button class="ui-btn sm ghost" data-draft="faq">' + UI.icon('sparkle') + 'Suggest questions from my facts</button>';
       }
@@ -384,8 +398,9 @@
       var html = '<h2>Languages</h2><p class="muted">Your site is written in English. Switch on more languages and guests get a language button ' +
         '(and their browser\'s language first). The site\'s own words, the guest profiles and the hour-by-hour stays are translated for you. ' +
         'Translate your own texts below; anything you leave empty shows in English.</p>' +
-        '<div class="ed-chips">' + EXTRA_LANGS.map(function (c) { return chip('langs', c, NS.LANGS[c].name); }).join('') + '</div>';
-      if (!on.length) return html + '<p class="small muted" style="margin-top:14px">Latvian, Russian and German are ready. More can be added on request.</p>';
+        '<div class="ed-chips">' + EXTRA_LANGS.map(function (c) { return chip('langs', c, NS.LANGS[c].name); }).join('') + '</div>' +
+        EXTRA_LANGS.filter(function (c) { return LANG_HINTS[c]; }).map(function (c) { return '<p class="ui-hint">' + UI.icon('info') + esc(NS.LANGS[c].name) + ': ' + esc(LANG_HINTS[c]) + '.</p>'; }).join('');
+      if (!on.length) return html + '<p class="small muted" style="margin-top:14px">Latvian, Russian, German and French are ready. More can be added on request.</p>';
       if (on.indexOf(st.trlang) < 0) st.trlang = on[0];
       var lang = st.trlang, words = (d.i18n && d.i18n[lang]) || {}, tr = translatable(d);
       var total = 0, done = 0;
@@ -578,6 +593,7 @@
       if (t.closest('[data-perclose]')) { e.preventDefault(); hooks.persona(''); return; }
       if ((b = t.closest('[data-pn]'))) { st.pn = +b.getAttribute('data-pn'); drawPanel(); return; }
       if ((b = t.closest('[data-pershow]'))) { hooks.previewMsg(JSON.stringify({ type: 'show-persona', persona: b.getAttribute('data-pershow') })); return; }
+      if (t.closest('[data-thanksshow]')) { hooks.previewMsg(JSON.stringify({ type: 'show-thanks' })); return; }
       if (t.closest('[data-more]')) { st.plimit += 120; drawPanel(); return; }
       if (t.closest('[data-relocate]')) { relocate(); return; }
       if ((b = t.closest('[data-rescan]'))) { rescan(b); }

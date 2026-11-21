@@ -6,7 +6,8 @@
   1. Anvil's own validator (`anvil validate`, @anvil-works/anvil-cli): anvil.yaml, every form template and every
      client/server Python file, type-checked against Anvil's API stubs. Kit files shared by all apps (SEO, legal) are
      reported but don't fail the check.
-  2. node --check on the JavaScript engines in theme/assets.
+  2. node --check on the JavaScript engines in theme/assets; the hotel-site dictionary (tools/i18n_dict.py: every row
+     has Latvian, Russian, German and French with the English key's {placeholders}).
   3. Asset hashes in anvil.yaml are current (tools/assets.py).
   4. Server tests (tools/testing/test_server.py, strict Anvil mock).
   5. The design check (APP_MAKER/tools/design_check.py): printed as a note, never fails the run.
@@ -80,6 +81,8 @@ def main():
     js = sorted((ROOT / "theme" / "assets").glob("*.js"))
     errs = [p.name + ": " + run(["node", "--check", str(p)]).stderr.strip() for p in js if run(["node", "--check", str(p)]).returncode]
     step("JavaScript parses (%d files)" % len(js), not errs, "\n".join(errs))
+    r = run([sys.executable, "-I", str(ROOT / "tools" / "i18n_dict.py")])  # every DICT row: lv, ru, de, fr + the {placeholders}
+    step("hotel-site dictionary: " + ((r.stdout.strip().splitlines() or ["?"])[-1]), r.returncode == 0, r.stdout[-2500:])
     r = run([sys.executable, str(ROOT / "tools" / "assets.py")])
     step("asset hashes", r.returncode == 0, r.stdout + r.stderr)
     if "updated" in r.stdout:

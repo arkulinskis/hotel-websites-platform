@@ -77,8 +77,16 @@ def structured_data(data, url, image):
     return {k: v for k, v in out.items() if v}
 
 
-LANGS = ("en", "lv", "ru", "de")
-LOCALES = {"en": "en_GB", "lv": "lv_LV", "ru": "ru_RU", "de": "de_DE"}
+LANGS = ("en", "lv", "ru", "de", "fr")
+LOCALES = {"en": "en_GB", "lv": "lv_LV", "ru": "ru_RU", "de": "de_DE", "fr": "fr_FR"}
+
+
+def locale(lang, data):
+    """og:locale: Canadian hotels get fr_CA / en_CA (Quebec), everyone else the table above."""
+    country = str((data.get("hotel") or {}).get("country") or "").strip().lower()
+    if country in ("canada", "ca", "québec", "quebec") and lang in ("fr", "en"):
+        return lang + "_CA"
+    return LOCALES[lang]
 
 
 def site_langs(data):
@@ -109,7 +117,7 @@ def page_html(data, slug, app, api, lang="en"):
     if len(langs) > 1:
         alternates = "".join('<link rel="alternate" hreflang="%s" href="%s">\n' % (c, base if c == "en" else base + "?lang=" + c) for c in langs)
         alternates += '<link rel="alternate" hreflang="x-default" href="%s">\n' % base
-        alternates += '<meta property="og:locale" content="%s">\n' % LOCALES[lang]
+        alternates += '<meta property="og:locale" content="%s">\n' % locale(lang, data)
     bg = BG.get((data.get("theme") or {}).get("palette") or "riga", "#f3ecdf")
     initial = (re.sub(r"^(hotel|boutique|the|villa|pension)\s+", "", name, flags=re.I).strip() or "H")[0].upper()
     icon = ("data:image/svg+xml," + "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%231f5c55'/%3E"

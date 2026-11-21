@@ -3,9 +3,12 @@
    NSSite.boot(data, opts) is what a hosted or exported page calls: it mounts into #ns-root.
    opts: mode 'live' | 'preview' | 'export'; media {m: base url for "m:KEY" uploads, a: base url for "a:file" starter
    photos}; stats (url to ping, live only); slug; platform {name, url}; lib {maplibre, maplibreCss}; noMap; persona;
-   lang (en | lv | ru | de: the language to start in, see 15-i18n.js); ask (url of the guest question endpoint).
+   lang (en | lv | ru | de | fr: the language to start in, see 15-i18n.js); ask (url of the guest question endpoint).
    Every word the site shows goes through T() (NSSite.t, the built-in dictionary) or TR() (NSSite.tr, the owner's own
-   texts and their translations). The "Ask us a question" form sits in the contact section (data.contact.ask_off hides it). */
+   texts and their translations). The "Ask us a question" form sits in the contact section (data.contact.ask_off hides it).
+   "Ask us for your dates" (booking.request.on, off by default) sits under the booking steps and posts to the same
+   endpoint with kind 'dates'. An address ending in #thanks (the check-out QR card) opens the thank-you sheet: review
+   links (booking.after.google_review + every score with a link), "Tell us privately" and the come-back code. */
 (function () {
   'use strict';
   var NS = window.NSSite, e = NS.esc, ic = NS.icon, T = NS.t, TH = NS.th, TR = NS.tr;
@@ -108,10 +111,14 @@
     }
     function persona() { return S.persona ? NS.persona(S.persona) : null; }
     function heroFor(p) {
-      var who = NS.lang === 'en' ? p.name.toLowerCase().replace(/^the /, '') : NS.lcFirst(T(p.name));
+      // French keeps the profile's name as a title (« Pour le profil « Couple gourmand » : »), so no lower-casing.
+      var who = NS.lang === 'en' ? p.name.toLowerCase().replace(/^the /, '') : NS.lang === 'fr' ? T(p.name) : NS.lcFirst(T(p.name));
       return '<p class="ns-hero-for">' + ic(p.icon) + '<span><b>' + e(T('For {who}:', { who: who })) + '</b> ' + e(T(p.hook)) + '</span></p>';
     }
     function askOn() { return !NS.get(data, 'contact.ask_off', false); }
+    function requestOn() { return !!NS.get(data, 'booking.request.on', false); }
+    function requestHere() { return requestOn() && has('booking'); }
+    function hotelName() { return NS.get(data, 'hotel.name', '') || T('the hotel'); }
 
     /* ---------------------------------------------------------------- sections */
     var SECTIONS = {
@@ -207,7 +214,8 @@
               (r.text ? '<div class="ns-room-text">' + NS.rich(TR(r.text)) + '</div>' : '') +
               ((r.features || []).length ? '<ul class="ns-feats">' + r.features.slice(0, 6).map(function (f) { return '<li>' + ic('check') + e(TR(f)) + '</li>'; }).join('') + '</ul>' : '') +
               (tools ? '<div class="ns-room-tools">' + tools + '</div>' : '') +
-              '<div class="ns-room-foot">' + (r.price ? '<span class="ns-price">' + TH('from {price} / night', { price: '<b>' + e(r.price) + '</b>' }) + '</span>' : '<span></span>') + bookBtn('sm', 'Check dates') + '</div></div></article>';
+              '<div class="ns-room-foot">' + (r.price ? '<span class="ns-price">' + TH('from {price} / night', { price: '<b>' + e(r.price) + '</b>' }) + '</span>' : '<span></span>') + bookBtn('sm', 'Check dates') + '</div>' +
+              (requestHere() ? '<button class="ns-room-ask" type="button" data-request-room="' + e(r.name) + '">' + ic('mail') + e(T('Ask us directly')) + '</button>' : '') + '</div></article>';
           }).join('') + '</div>';
       },
 
@@ -355,7 +363,7 @@
               (pay.note ? '<p class="ns-small">' + e(TR(pay.note)) + '</p>' : '') + '</li>' +
             '<li><span class="ns-step-n">3</span><h3>' + ic('key') + e(T('Arrive and relax')) + '</h3><p>' + e(TR(b.step3) || T('Check-in from {in}, check-out until {out}. We will have your room ready.', { 'in': h.checkin || '15:00', out: h.checkout || '12:00' })) + '</p></li>' +
           '</ol>' +
-          (b.perk ? '<div class="ns-perk">' + ic('star') + '<p>' + e(TR(b.perk)) + '</p></div>' : '') +
+          (requestOn() ? requestForm() : b.perk ? '<div class="ns-perk">' + ic('star') + '<p>' + e(TR(b.perk)) + '</p></div>' : '') +
           (pol.length ? '<div class="ns-pols">' + pol.map(function (x) { return '<div class="ns-pol">' + ic(x.icon || 'info') + '<div><h4>' + e(TR(x.title)) + '</h4><p>' + e(TR(x.text || '')) + '</p></div></div>'; }).join('') + '</div>' : '');
       },
 
@@ -395,6 +403,89 @@
         '<p class="ns-ask-msg" role="status" aria-live="polite"></p>' +
         '<div class="ns-ask-foot"><button class="ns-btn primary" type="submit">' + e(T('Send question')) + ic('arrow') + '</button>' +
         '<small>' + e(T('Your message goes only to {hotel}, who use your email to reply.', { hotel: hn })) + '</small></div></form></div>';
+    }
+    /* "Ask us for your dates" (booking.request.on): an enquiry, not a booking, so guests still book on the OTA buttons
+       above it if they prefer. Posts to opts.ask with kind 'dates' (GuestQuestions.accept); the owner replies with a price
+       from the #questions inbox. The perk shows here, beside the form. */
+    function isoDay(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+    function requestForm() {
+      var b = data.booking || {}, p = persona(), rooms = (data.rooms || []).filter(function (r) { return r && r.name; });
+      var nights = S.nights || (p && p.nights) || 2;
+      var range = function (a, z, cur) {
+        var s = '';
+        for (var i = a; i <= z; i++) s += '<option value="' + i + '"' + (i === cur ? ' selected' : '') + '>' + i + '</option>';
+        return s;
+      };
+      var lead = TR(NS.get(data, 'booking.request.note', '')) || T('Tell us when you would like to come. We email you our best direct price, usually within a day.');
+      return '<div class="ns-request" id="ns-request">' + NS.orn.corner('tl') + NS.orn.corner('tr') +
+        '<div class="ns-request-head">' + ic('calendar') + '<div><h3>' + e(T('Ask us for your dates')) + '</h3><p>' + e(lead) + '</p></div></div>' +
+        (b.perk ? '<p class="ns-request-perk">' + ic('star') + '<span><b>' + e(T('Book direct')) + '</b> ' + e(TR(b.perk)) + '</span></p>' : '') +
+        '<form class="ns-ask-form ns-request-form" data-request-form novalidate><div class="ns-request-grid">' +
+        '<label class="w2"><span>' + e(T('Arrival')) + '</span><input type="date" name="arrive" required min="' + isoDay(new Date()) + '"></label>' +
+        '<label><span>' + e(T('Nights')) + '</span><select name="nights">' + range(1, 30, nights) + '</select></label>' +
+        '<label><span>' + e(T('Adults')) + '</span><select name="adults">' + range(1, 10, 2) + '</select></label>' +
+        '<label><span>' + e(T('Children')) + '</span><select name="children">' + range(0, 8, 0) + '</select></label>' +
+        '<label class="w3"><span>' + e(T('Room')) + '</span><select name="room"><option value="">' + e(T('Any room')) + '</option>' +
+          rooms.map(function (r) { return '<option value="' + e(r.name) + '">' + e(TR(r.name)) + '</option>'; }).join('') + '</select></label>' +
+        '<label class="w2"><span>' + e(T('Your name')) + '</span><input name="name" autocomplete="name" maxlength="80" required></label>' +
+        '<label class="w2"><span>' + e(T('Your email')) + '</span><input name="email" type="email" autocomplete="email" maxlength="200" required></label>' +
+        '<label class="w2"><span>' + e(T('Phone (optional)')) + '</span><input name="phone" type="tel" autocomplete="tel" maxlength="40"></label></div>' +
+        '<label><span>' + e(T('Anything we should know? (optional)')) + '</span><textarea name="note" rows="3" maxlength="1500"></textarea></label>' +
+        '<label class="ns-hp" aria-hidden="true">Website <input name="website" tabindex="-1" autocomplete="off"></label>' +
+        '<p class="ns-ask-msg" role="status" aria-live="polite"></p>' +
+        '<div class="ns-ask-foot"><button class="ns-btn primary" type="submit">' + e(T('Ask for a price')) + ic('arrow') + '</button>' +
+        '<small>' + e(T('Not a booking yet: you decide once you have our offer.')) + ' ' + e(T('Your message goes only to {hotel}, who use your email to reply.', { hotel: hotelName() })) + '</small></div></form></div>';
+    }
+    /* The thank-you sheet (#thanks, from the check-out QR card). Review places and the private note sit side by side, so
+       every guest sees the same choices (no review gating). Works with nothing set: thanks + the private note. */
+    function reviewLinks() {
+      var g = NS.get(data, 'booking.after.google_review', ''), out = [];
+      if (g && /^https?:\/\//i.test(g)) out.push({ label: 'Google', url: g });
+      (data.ratings || []).forEach(function (r) {
+        if (r && r.url && /^https?:\/\//i.test(r.url) && !out.some(function (x) { return x.url === r.url; })) out.push({ label: r.source || 'Reviews', url: r.url });
+      });
+      return out;
+    }
+    function returnCode() { return String(NS.get(data, 'booking.after.return_code', '') || '').trim().toUpperCase().slice(0, 24); }
+    function thanksHtml() {
+      var h = data.hotel || {}, revs = reviewLinks(), code = returnCode(), perk = NS.get(data, 'booking.after.return_perk', '');
+      var priv = askOn() && has('contact') ? '<button class="ns-btn" type="button" data-thanks-ask>' + ic('chat') + e(T('Write to us')) + '</button>'
+        : h.email ? '<a class="ns-btn" href="mailto:' + e(h.email) + '">' + ic('mail') + e(T('Write to us')) + '</a>'
+        : h.phone ? '<a class="ns-btn" href="tel:' + e(String(h.phone).replace(/\s+/g, '')) + '">' + ic('phone') + e(h.phone) + '</a>' : '';
+      var cards = (revs.length ? '<section class="ns-thanks-card"><h3>' + ic('star') + e(T('Tell others about your stay')) + '</h3><p>' + e(T('A few words on any of these sites helps a small hotel more than you think.')) + '</p>' +
+          '<div class="ns-thanks-revs">' + revs.map(function (r) { return '<a class="ns-btn" href="' + e(r.url) + '" target="_blank" rel="noopener">' + e(r.label) + ic('external') + '</a>'; }).join('') + '</div></section>' : '') +
+        (priv ? '<section class="ns-thanks-card"><h3>' + ic('heart') + e(T('Tell us privately')) + '</h3><p>' + e(T('Something we could do better, or a thank-you just for us? Only {hotel} reads it.', { hotel: hotelName() })) + '</p>' +
+          '<div class="ns-thanks-revs">' + priv + '</div></section>' : '');
+      var back = perk || code ? '<div class="ns-thanks-back"><h3>' + ic('key') + e(T('Come back direct')) + '</h3>' + (perk ? '<p>' + e(TR(perk)) + '</p>' : '') +
+        '<div class="ns-thanks-act">' + (code ? '<div class="ns-code"><span>' + e(T('Your code')) + '</span><b>' + e(code) + '</b><button class="ns-btn sm" type="button" data-copy-code="' + e(code) + '">' + ic('copy') + '<span>' + e(T('Copy')) + '</span></button></div>' : '') +
+        (requestHere() ? '<button class="ns-btn primary" type="button" data-request data-request-code="' + e(code) + '">' + ic('calendar') + e(T('Ask for your dates')) + '</button>' : '') + '</div></div>' : '';
+      return '<div class="ns-thanks" lang="' + NS.lang + '"><div class="ns-thanks-head">' + NS.orn.monogram(h.name) + '<h2>' + e(T('Thank you for staying with us')) + '</h2>' +
+        (h.name ? '<p>' + e(h.name) + '</p>' : '') + NS.orn.divider() + '</div>' +
+        (cards ? '<div class="ns-thanks-grid' + (revs.length && priv ? ' two' : '') + '">' + cards + '</div>' : '') + back + '</div>';
+    }
+    function showThanks() {
+      if (S.thanks) S.thanks.close();
+      var m = S.thanks = NS.Modal(thanksHtml());
+      m.el.classList.add('ns-thanks-modal');
+      m.onclose = function () {
+        S.thanks = null;
+        if (opts.mode !== 'preview' && /^#thanks/.test(location.hash)) { try { history.replaceState(null, '', location.pathname + location.search); } catch (x) {} }
+      };
+      var first = m.el.querySelector('.ns-thanks a, .ns-thanks button');
+      if (first) { try { first.focus({ preventScroll: true }); } catch (x) {} }
+      return m;
+    }
+    function closeThanks() { if (S.thanks) S.thanks.close(); }
+    function goTo(id, field, value) {
+      var el = root.querySelector('#' + id);
+      if (!el) return false;
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      var f = field && el.querySelector('[name="' + field + '"]');
+      if (f) {
+        if (value != null && !f.value) f.value = value;
+        setTimeout(function () { try { f.focus({ preventScroll: true }); } catch (x) {} }, 450);
+      }
+      return true;
     }
     function langSwitch(cls) {
       var ls = NS.siteLangs(data);
@@ -603,6 +694,24 @@
       var lg = t.closest('[data-lang]');
       if (lg) { setLang(lg.getAttribute('data-lang')); return; }
       if (t.closest('[data-ask-again]')) { redrawSection('contact'); var af = root.querySelector('#ns-ask input'); if (af) af.focus(); return; }
+      if (t.closest('[data-request-again]')) { redrawSection('booking'); goTo('ns-request', 'arrive'); return; }
+      var rr = t.closest('[data-request-room]');
+      if (rr) {
+        var rsel = root.querySelector('#ns-request select[name="room"]');
+        if (rsel) rsel.value = rr.getAttribute('data-request-room');
+        goTo('ns-request', 'arrive');
+        return;
+      }
+      var rq = t.closest('[data-request]');
+      if (rq) {
+        var rcode = rq.getAttribute('data-request-code');
+        closeThanks();
+        goTo('ns-request', rcode ? 'note' : 'arrive', rcode ? T('Come-back code: {code}', { code: rcode }) : null);
+        return;
+      }
+      if (t.closest('[data-thanks-ask]')) { closeThanks(); goTo('ns-ask', 'message'); return; }
+      var cc = t.closest('[data-copy-code]');
+      if (cc) { copyText(cc.getAttribute('data-copy-code'), cc); return; }
       var lb = t.closest('[data-lb]');
       if (lb) {
         var group = lb.getAttribute('data-lb'), imgs = root.querySelectorAll('[data-lb="' + group + '"]');
@@ -669,12 +778,58 @@
       if (fs) { var pe = fs.closest('.ns-pano'); if (pe && pe.requestFullscreen) pe.requestFullscreen(); return; }
     }
     function roomAt(i) { return (data.rooms || []).filter(function (x) { return x && x.name; })[+i]; }
+    /* The come-back code: the clipboard where allowed, else a hidden field + execCommand (older phones, http pages). */
+    function copyText(text, btn) {
+      var done = function () { var s = btn.querySelector('span'); if (s) s.textContent = T('Copied'); btn.classList.add('ok'); };
+      var fallback = function () {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(); } catch (x) {}
+        ta.remove();
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+      else fallback();
+    }
     function onChange(ev) {
       var t = ev.target;
       if (t.matches('[data-stay-persona]')) { S.persona = t.value; S.nights = null; S.day = 0; redrawPersonaParts(); var st = root.querySelector('#ns-stay'); if (st) st.scrollIntoView({ block: 'start' }); if (opts.stats) ping('p', t.value); }
       if (t.matches('[data-season]')) { S.season = t.value; redrawSection('stay'); }
     }
+    /* The date request: checked here (past dates refused, translated), then again on the server. */
+    function submitRequest(f) {
+      var field = function (n) { return f.elements.namedItem(n); }, val = function (n) { return String(field(n).value || '').trim(); };
+      var msg = f.querySelector('.ns-ask-msg'), btn = f.querySelector('[type=submit]');
+      var say = function (text, bad) { msg.textContent = text; msg.className = 'ns-ask-msg' + (bad ? ' bad' : ''); };
+      var arrive = val('arrive'), today = isoDay(new Date()), email = val('email'), name = val('name');
+      var limit = new Date(); limit.setDate(limit.getDate() + 730);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(arrive) || arrive < today || arrive > isoDay(limit)) { say(T('Please check your dates.'), true); field('arrive').focus(); return; }
+      if (!name) { say(T('Please tell us your name.'), true); field('name').focus(); return; }
+      if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(email)) { say(T('Please check your email address.'), true); field('email').focus(); return; }
+      if (!opts.ask || opts.mode === 'preview') { say(T('The form works on the published site.'), true); return; }
+      var failed = function () { btn.disabled = false; say(T('Sorry, the request could not be sent. Please email us instead.'), true); };
+      btn.disabled = true; say(T('Sending…'));
+      fetch(opts.ask, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify({
+        s: opts.slug, kind: 'dates', name: name, email: email, message: val('note'), lang: NS.lang, persona: S.persona || '',
+        details: { arrive: arrive, nights: +val('nights') || 1, adults: +val('adults') || 1, children: +val('children') || 0, room: val('room'), phone: val('phone') },
+        hp: field('website').value, t: Date.now() - S.askOpened }) })
+        .then(function (r) { return r.json().catch(function () { return { ok: false, error: 'server' }; }); })
+        .then(function (r) {
+          if (r && r.ok) {
+            f.outerHTML = '<div class="ns-ask-done ns-request-done" role="status">' + ic('check') + '<p>' + e(T('Thank you!')) + ' ' + e(T('{hotel} will email you a price for your dates soon.', { hotel: hotelName() })) + '</p>' +
+              '<button class="ns-btn sm" type="button" data-request-again>' + e(T('Ask about other dates')) + '</button></div>';
+            return;
+          }
+          btn.disabled = false;
+          var err = r && r.error;
+          say(T(err === 'dates' ? 'Please check your dates.' : err === 'email' ? 'Please check your email address.' :
+            err === 'busy' ? 'Too many requests right now. Please try again later, or email us.' :
+            err === 'closed' ? 'This form is closed right now. Please email us instead.' : 'Sorry, the request could not be sent. Please email us instead.'), true);
+        }, failed);
+    }
     function onSubmit(ev) {
+      var rf = ev.target.closest && ev.target.closest('[data-request-form]');
+      if (rf) { ev.preventDefault(); submitRequest(rf); return; }
       var f = ev.target.closest && ev.target.closest('[data-ask]');
       if (!f) return;
       ev.preventDefault();
@@ -708,6 +863,7 @@
     root.addEventListener('submit', onSubmit);
 
     draw();
+    if (opts.mode !== 'preview' && /^#thanks\b/.test(location.hash)) setTimeout(showThanks, 60);   // the check-out QR card
     if (opts.mode === 'live') ping('view');
     if (S.persona && opts.mode !== 'preview') setTimeout(function () { var el = root.querySelector('#ns-stay'); if (el && location.hash.indexOf('for=') >= 0) el.scrollIntoView(); }, 400);
 
@@ -715,6 +871,7 @@
       update: function (d) { data = S.data = d; S.filter = null; draw(); },
       setPersona: setPersona,
       setLang: setLang,
+      showThanks: showThanks,
       scrollTo: function (id) { var el = root.querySelector('#ns-' + id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
       state: S,
       destroy: function () { destroyWidgets(); if (S.map) S.map.destroy(); root.removeEventListener('click', onClick); root.removeEventListener('change', onChange); root.removeEventListener('submit', onSubmit); root.innerHTML = ''; }
@@ -741,6 +898,7 @@
       if (m.type === 'ns-scroll' && NS.site) NS.site.scrollTo(m.section);
       if (m.type === 'ns-persona' && NS.site) NS.site.setPersona(m.persona);
       if (m.type === 'ns-lang') { if (NS.site) NS.site.setLang(m.lang); else opts = Object.assign({}, opts, { lang: m.lang }); }
+      if (m.type === 'ns-thanks' && NS.site) NS.site.showThanks();
     });
     parent.postMessage({ type: 'ns-ready' }, '*');
   };

@@ -851,6 +851,12 @@ anvil-dropzone { display: contents; }
 .qs-item .qs-mail { font-size: .9rem; overflow-wrap: anywhere; }
 .qs-msg { margin: 10px 0 4px; white-space: pre-line; overflow-wrap: anywhere; font-size: 1.02rem; line-height: 1.55; }
 .qs-persona { margin: 0 0 8px; }
+/* date requests (GuestQuestions kind "dates"): a gilt badge and the dates line */
+.ui-badge.gold { background: var(--c-accent-soft); color: var(--c-ink); box-shadow: inset 0 0 0 1px var(--c-accent); }
+.qs-dates { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: 10px 0 2px; padding: 10px 14px; border-radius: var(--radius-sm);
+  background: var(--c-accent-soft); border: 1px dashed var(--c-accent); font-weight: 600; overflow-wrap: anywhere; }
+.qs-dates .ic { color: var(--c-accent); }
+.qs-dates .qs-phone { font-weight: 500; color: var(--c-muted); }
 .qs-actions { gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .qs-tip { display: flex; gap: 14px; align-items: flex-start; margin-top: 26px; padding: 18px 20px; }
 .qs-tip > .ic { width: 22px; height: 22px; color: var(--c-accent); margin-top: 2px; }

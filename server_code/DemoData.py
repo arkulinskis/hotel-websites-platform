@@ -29,8 +29,40 @@ def ensure_loaded():
     from . import Showcase
     Showcase.ensure()
     rebrand()
+    upgrade()
     if state() == "never":
         load()
+
+
+# The direct-booking extras every demo site shows (2026-11-20): date requests on, a perk, a come-back code.
+# Kristofs (the showcase) is a real hotel: it stays as its owner leaves it.
+DEMO_VERSION = "2026-11-20"
+DEMO_PERKS = {
+    "villa-kapas-demo": ("Book direct and the first evening's sauna is on us.", "10% off your next stay when you book with us.", "KAPAS10"),
+    "atelier-rooms-demo": ("Book direct and get breakfast in the courtyard for free.", "A free late check-out until 15:00 next time.", "ATELIER"),
+}
+
+
+def demo_extras(slug, data):
+    """Switch the date-request form on for a demo site and give it a perk and a come-back code (unchanged if set)."""
+    perk, back, code = DEMO_PERKS.get(slug, ("Book direct and get a welcome drink.", "10% off your next stay.", "THANKYOU"))
+    booking = data.setdefault("booking", {})
+    booking.setdefault("request", {"on": True})
+    if not booking.get("perk"):
+        booking["perk"] = perk
+    booking.setdefault("after", {"return_perk": back, "return_code": code})
+    return data
+
+
+def upgrade():
+    """Once per DEMO_VERSION: demo sites loaded earlier get the extras too (draft and published copy)."""
+    if C.get_setting("demo_version") == DEMO_VERSION:
+        return
+    for site in app_tables.sites.search(is_demo=True):
+        for col in ("data", "live"):
+            if site[col]:
+                site[col] = demo_extras(site["slug"], dict(site[col]))
+    C.set_setting("demo_version", DEMO_VERSION)
 
 
 OLD_BRAND, BRAND = "Nouveau Stay", "ArviStay"
@@ -64,7 +96,7 @@ def load():
         slug = spec["slug"]
         if app_tables.sites.get(slug=slug) is not None:
             continue
-        data = spec["data"]
+        data = demo_extras(slug, spec["data"])
         now = C.now() - dt.timedelta(days=3 + i)
         site = app_tables.sites.add_row(owner=users[i % len(users)], slug=slug, name=data["hotel"]["name"], city=data["hotel"].get("city", ""),
                                         status="published", data=data, live=data, version=1, created=now - dt.timedelta(days=20), updated=now,
